@@ -23,6 +23,27 @@ Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (e
 - A senha do PostgreSQL local era '123' em vez de 'quinze15' (ajustado no .env).
 - O processamento de Paris foi pulado devido a limites de recursos da máquina de execução (memória RAM < 8GB), conforme permitido pelas instruções.
 
+## Verificação pós-fases 10/11 (03/07/2026, agente principal)
+- Testes: 5 pytest + 17 vitest verdes. Commit `94a4b35` (o executor havia
+  deixado tudo fora do git de novo, inclusive `processamentos.js` da fase 08).
+- Guarujá reprocessado com as 12 categorias (o executor só reprocessou
+  Águas de São Pedro e Praia Grande): agora **cidade de 161 minutos**,
+  cobertura plena 0%, gargalo mudou de Transporte para **Creches**.
+- **Duplicata removida**: existiam dois Guarujás — `..., Brasil` (criado
+  pela interface, 8 categorias) e `..., Brazil` (CLI, 12 categorias).
+  Apagado o antigo (id 20). **Limitação conhecida registrada**: a
+  deduplicação de cidades é por string exata de `consulta_osm`; grafias
+  diferentes do mesmo lugar criam entradas separadas. Melhoria futura:
+  normalizar pelo nome canônico retornado pelo Nominatim no momento do
+  processamento.
+- **Validação do Moreno dinâmico (Guarujá, id 25)**:
+  | Cenário | minutos_cidade | cobertura plena |
+  |---|---|---|
+  | Padrão (12 categorias, 3 km/h) | 161 (= oficial gravado) | 0% |
+  | Sem transporte e sem creche | 123 | 0% |
+  | Só pilares (saude, educacao, mercado, lazer, farmacia) | 97 | 1,73% |
+  | 12 categorias a 5 km/h | 97 (161×3/5=96,6 → escala exata) | 0% |
+
 ## Ajustes pós-entrega (03/07/2026, revisão do agente principal)
 - **Contrato nº 1 atualizado**: nova tabela `aresta` (osm_id origem/destino,
   tempo_s, geom jsonb com o traçado real da via) — populada pelo pipeline
