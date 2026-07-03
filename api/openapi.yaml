@@ -1,0 +1,412 @@
+openapi: 3.0.3
+info:
+  title: API de Alcançabilidade Urbana — Cidade de 15 Minutos
+  version: 1.0.0
+  description: >-
+    API REST para consultar índices de alcançabilidade urbana baseados no conceito de Cidade de 15 Minutos.
+    Dados de mobilidade urbana fornecidos sob licença ODbL pelos colaboradores do OpenStreetMap (OSM).
+servers:
+  - url: http://localhost:3000/api/v1
+paths:
+  /saude:
+    get:
+      summary: Health check da API e do banco
+      responses:
+        '200':
+          description: Status da API e conectividade com o banco
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  banco:
+                    type: boolean
+                    example: true
+  /cidades:
+    get:
+      summary: Lista cidades processadas
+      responses:
+        '200':
+          description: Lista de cidades com estatísticas agregadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CidadeResumida'
+  /cidades/{id}:
+    get:
+      summary: Detalhe de uma cidade e seus índices por categoria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Dados detalhados da cidade e lista de índices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CidadeDetalhada'
+        '404':
+          description: Cidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /cidades/{id}/servicos:
+    get:
+      summary: Retorna serviços mapeados na cidade em formato GeoJSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoria
+          in: query
+          required: false
+          schema:
+            type: string
+            example: saude
+      responses:
+        '200':
+          description: Coleção de pontos GeoJSON
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: FeatureCollection
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          example: Feature
+                        geometry:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              example: Point
+                            coordinates:
+                              type: array
+                              items:
+                                type: number
+                              example: [-46.4028, -24.0058]
+                        properties:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 45
+                            nome:
+                              type: string
+                              nullable: true
+                              example: "Hospital Municipal"
+                            categoria:
+                              type: string
+                              example: "saude"
+                            rotulo:
+                              type: string
+                              example: "Saúde (hospitais)"
+        '400':
+          description: Parâmetro inválido ou sem filtro se limite excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /cidades/{id}/isocronas:
+    get:
+      summary: Retorna isócronas em formato GeoJSON para uma categoria
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoria
+          in: query
+          required: true
+          schema:
+            type: string
+            example: saude
+        - name: minutos
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+      responses:
+        '200':
+          description: MultiPolígono GeoJSON da isócrona
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Isócrona não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /cidades/{id}/mapa:
+    get:
+      summary: Amostra de nós para o mapa de calor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoria
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: max
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 3000
+      responses:
+        '200':
+          description: Amostra de pontos para renderização de calor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                      example: -24.0058
+                    lon:
+                      type: number
+                      example: -46.4028
+                    tempo_min:
+                      type: number
+                      nullable: true
+                      example: 8.5
+                    dentro_limiar:
+                      type: boolean
+                      example: true
+  /alcancabilidade:
+    get:
+      summary: Detalha alcançabilidade de um ponto clicado no mapa
+      parameters:
+        - name: cidade_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Detalhes do nó mais próximo e tempos de acesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetalhamentoPonto'
+        '404':
+          description: Ponto fora da área processada da cidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comparar:
+    get:
+      summary: Compara índices de até 5 cidades
+      parameters:
+        - name: cidades
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "1,2"
+      responses:
+        '200':
+          description: Lista de dados comparativos das cidades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    cidade:
+                      $ref: '#/components/schemas/CidadeResumida'
+                    indices:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/IndiceCategoria'
+        '400':
+          description: Mais de 5 cidades solicitadas ou IDs inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+components:
+  schemas:
+    CidadeResumida:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nome:
+          type: string
+          example: "Praia Grande"
+        pais:
+          type: string
+          example: "Brazil"
+        consulta_osm:
+          type: string
+          example: "Praia Grande, São Paulo, Brazil"
+        data_calculo:
+          type: string
+          format: date-time
+          example: "2026-07-03T10:00:00Z"
+        qtd_nos:
+          type: integer
+          example: 6500
+        limiar_minutos:
+          type: integer
+          example: 15
+        indice_geral:
+          type: number
+          example: 78.45
+    CidadeDetalhada:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nome:
+          type: string
+          example: "Praia Grande"
+        pais:
+          type: string
+          example: "Brazil"
+        consulta_osm:
+          type: string
+        data_calculo:
+          type: string
+          format: date-time
+        qtd_nos:
+          type: integer
+        qtd_arestas:
+          type: integer
+        tempo_execucao_s:
+          type: number
+        velocidade_kmh:
+          type: number
+        limiar_minutos:
+          type: integer
+        indices:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndiceCategoria'
+    IndiceCategoria:
+      type: object
+      properties:
+        chave:
+          type: string
+          example: "saude"
+        rotulo:
+          type: string
+          example: "Saúde (hospitais)"
+        cor_hex:
+          type: string
+          example: "#e74c3c"
+        tempo_medio_min:
+          type: number
+          nullable: true
+          example: 12.34
+        pct_dentro_limiar:
+          type: number
+          example: 85.20
+        indice:
+          type: number
+          example: 85.20
+    DetalhamentoPonto:
+      type: object
+      properties:
+        no:
+          type: object
+          properties:
+            osm_id:
+              type: integer
+              format: int64
+              example: 457812
+            lat:
+              type: number
+            lon:
+              type: number
+            distancia_m:
+              type: number
+              example: 15.4
+        indice_ponto:
+          type: number
+          example: 75.0
+        categorias:
+          type: array
+          items:
+            type: object
+            properties:
+              chave:
+                type: string
+              rotulo:
+                type: string
+              cor_hex:
+                type: string
+              tempo_min:
+                type: number
+                nullable: true
+                example: 10.2
+              dentro_limiar:
+                type: boolean
+                example: true
+              servico_mais_proximo:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: integer
+                  nome:
+                    type: string
+                    nullable: true
+                  lat:
+                    type: number
+                  lon:
+                    type: number
+    Erro:
+      type: object
+      properties:
+        erro:
+          type: string
+          example: "Cidade não encontrada"
+        codigo:
+          type: integer
+          example: 404
