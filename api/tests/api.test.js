@@ -114,4 +114,69 @@ describe('API Integration Tests', () => {
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('erro');
   });
+
+  // Novos Testes da Fase 08 & 09
+  it('POST /api/v1/processamentos com body vazio -> 400', async () => {
+    const res = await request(app).post('/api/v1/processamentos').send({});
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('erro');
+  });
+
+  it('POST /api/v1/processamentos com caracteres proibidos -> 400', async () => {
+    const res = await request(app).post('/api/v1/processamentos').send({ consulta_osm: "cidade; rm -rf" });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('erro');
+  });
+
+  it('POST /api/v1/processamentos com cidade já processada -> 200 com ja_processada: true', async () => {
+    const res = await request(app).post('/api/v1/processamentos').send({ consulta_osm: "Águas de São Pedro, São Paulo, Brazil" });
+    expect(res.status).toBe(200);
+    expect(res.body.ja_processada).toBe(true);
+    expect(res.body).toHaveProperty('cidade_id');
+  });
+
+  it('GET /api/v1/processamentos/atual -> 200 com job (objeto ou null)', async () => {
+    const res = await request(app).get('/api/v1/processamentos/atual');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('job');
+  });
+
+  it('GET /api/v1/cidades/:id/mapa?categoria=plena -> 200', async () => {
+    const res = await request(app).get(`/api/v1/cidades/${cidadeTestId}/mapa?categoria=plena`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  // Novos Testes da Fase 10 (Análise Configurável)
+  it('GET /api/v1/cidades/:id/moreno sem params -> 200 com valores corretos', async () => {
+    const res = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('minutos_cidade');
+    expect(res.body).toHaveProperty('pct_cobertura_plena');
+    expect(res.body).toHaveProperty('categoria_gargalo');
+    expect(res.body).toHaveProperty('distribuicao');
+  });
+
+  it('GET /api/v1/cidades/:id/moreno?velocidade=6 -> minutos_cidade diminui', async () => {
+    const defaultRes = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno`);
+    const fastRes = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?velocidade=6`);
+    expect(fastRes.status).toBe(200);
+    if (defaultRes.body.minutos_cidade !== null && fastRes.body.minutos_cidade !== null) {
+      expect(fastRes.body.minutos_cidade).toBeLessThanOrEqual(defaultRes.body.minutos_cidade);
+    }
+  });
+
+  it('GET /api/v1/cidades/:id/moreno?categorias=farmacia -> 200', async () => {
+    const res = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?categorias=farmacia`);
+    expect(res.status).toBe(200);
+    expect(res.body.parametros.categorias_usadas).toContain('farmacia');
+  });
+
+  it('GET /api/v1/cidades/:id/moreno com parametros invalidos -> 400', async () => {
+    const invalidCat = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?categorias=chave_invalida`);
+    expect(invalidCat.status).toBe(400);
+
+    const invalidVel = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?velocidade=99`);
+    expect(invalidVel.status).toBe(400);
+  });
 });

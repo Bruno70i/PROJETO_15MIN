@@ -77,6 +77,7 @@
         <a href="index.html">Mapa</a>
         <a href="comparar.html">Comparar</a>
         <a href="sobre.html" class="active">Sobre</a>
+        <a href="api.html">API</a>
       </nav>
     </div>
   </header>
@@ -101,6 +102,21 @@
       <li>Utiliza-se o algoritmo otimizado de **Dijkstra multi-source** por categoria de serviço para encontrar em lote o tempo mínimo até o estabelecimento mais próximo;</li>
       <li>O índice individual do ponto é calculado como a porcentagem de categorias essenciais que o pedestre alcança em até 15 minutos a partir daquele nó.</li>
     </ul>
+
+    <h3>Diagnóstico de Moreno para a Cidade</h3>
+    <p>
+      Para classificar a cidade como um todo segundo o conceito da <em>Cidade de 15 Minutos</em> de Carlos Moreno, o sistema calcula o <strong>tempo pior</strong> (\(tempo\_pior(v)\)) de cada ponto do território. Este tempo representa quantos minutos são necessários para que um pedestre partindo daquele nó tenha acesso a <strong>todas</strong> as categorias de serviços essenciais existentes na cidade.
+    </p>
+    <p>
+      Com base nessa distribuição, duas métricas principais definem a classificação municipal:
+    </p>
+    <ul>
+      <li><strong>Cobertura Plena:</strong> A porcentagem de nós da cidade cujo \(tempo\_pior(v) \le 15\) minutos. Ou seja, qual fração do território urbano atende integralmente ao critério de Moreno.</li>
+      <li><strong>Minutos da Cidade:</strong> O teto do percentil 90 da distribuição do tempo pior (\(\lceil P90(tempo\_pior) \rceil\)). Se os minutos da cidade forem, por exemplo, 22, isso significa que 90% de todo o território urbano consegue acessar todas as categorias de serviços em até 22 minutos de caminhada.</li>
+    </ul>
+    <p>
+      <strong>Nota sobre dados ausentes:</strong> Para evitar penalizar cidades pequenas por vazios de mapeamento do OpenStreetMap (ex.: rodoviária ausente no município), o cálculo desconsidera categorias que não possuem nenhum serviço mapeado na cidade, calculando a cobertura plena apenas sobre as categorias com pelo menos um serviço presente.
+    </p>
     
     <div class="team-card">
       <strong>Equipe de Desenvolvimento (UNIP 2026):</strong>

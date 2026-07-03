@@ -132,6 +132,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `</tr>`;
     });
     
+    // Linhas do Diagnóstico Moreno (Fase 09)
+    html += `
+      <tr style="background-color: #f8fafc; font-weight: 600;">
+        <td>Minutos da Cidade (Moreno)</td>
+    `;
+    dados.forEach(d => {
+      const min = d.moreno ? (d.moreno.minutos_cidade !== null ? `${d.moreno.minutos_cidade} min` : 'Sem cob. plena') : 'Reprocesse';
+      html += `<td>${min}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `
+      <tr style="background-color: #f8fafc; font-weight: 600;">
+        <td>Cobertura Plena (Todos os servicos <= 15 min)</td>
+    `;
+    dados.forEach(d => {
+      const cob = d.moreno ? `${d.moreno.pct_cobertura_plena.toFixed(1)}%` : 'Reprocesse';
+      html += `<td>${cob}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `
+      <tr style="background-color: #f8fafc; font-weight: 600;">
+        <td>Classificacao de Moreno</td>
+    `;
+    dados.forEach(d => {
+      if (d.moreno) {
+        let classeCor = 'vermelho';
+        if (d.moreno.classificacao === 'Cidade de 15 Minutos') classeCor = 'excelente';
+        else if (d.moreno.classificacao === 'Muito proxima do conceito') classeCor = 'amarelo';
+        else if (d.moreno.classificacao === 'Parcialmente aderente') classeCor = 'laranja';
+        html += `<td><span class="moreno-badge ${classeCor}" style="margin: 0; font-size: 0.75rem; padding: 3px 6px;">${d.moreno.classificacao}</span></td>`;
+      } else {
+        html += `<td>Reprocesse</td>`;
+      }
+    });
+    html += `</tr>`;
+
     html += `
       <tr class="highlighted-row">
         <td>Indice de Alcancabilidade Geral (0–100)</td>

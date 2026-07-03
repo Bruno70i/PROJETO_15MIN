@@ -88,4 +88,20 @@ CREATE TABLE IF NOT EXISTS isocrona (
     UNIQUE (cidade_id, categoria_id, minutos)
 );
 
+CREATE TABLE IF NOT EXISTS indice_moreno (
+    cidade_id             INTEGER PRIMARY KEY REFERENCES cidade(id) ON DELETE CASCADE,
+    limiar_minutos        INTEGER NOT NULL,
+    pct_cobertura_plena   NUMERIC(5,2) NOT NULL,
+    minutos_cidade        INTEGER,                -- NULL se cidade sem nós cobertos
+    tempo_pior_medio      NUMERIC(8,2),
+    tempo_pior_mediana    NUMERIC(8,2),
+    pct_nos_sem_cobertura NUMERIC(5,2) NOT NULL DEFAULT 0,
+    atende_conceito       BOOLEAN NOT NULL,
+    classificacao         TEXT NOT NULL,
+    categoria_gargalo_id  INTEGER REFERENCES categoria_servico(id),
+    pct_gargalo           NUMERIC(5,2),
+    categorias_ausentes   JSONB NOT NULL DEFAULT '[]'::jsonb,
+    distribuicao          JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
 COMMIT;

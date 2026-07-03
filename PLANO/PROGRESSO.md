@@ -14,8 +14,8 @@
 | 07 Deploy (opcional) | ⬜ pendente | | |
 | 08 Cidades sob demanda | ✅ concluída | 2026-07-03 | processar qualquer cidade pela interface, com progresso |
 | 09 Índice Moreno | ✅ concluída | 2026-07-03 | métrica da cidade inteira ("cidade de N minutos") |
-| 10 Análise configurável | ⬜ pendente | | categorias selecionáveis + velocidade + mapa por serviço (sem reprocessar) |
-| 11 Página da API | ⬜ pendente | | web/api.html com quickstart e exemplos reais |
+| 10 Análise configurável | ✅ concluída | 2026-07-03 | categorias selecionáveis + velocidade + mapa por serviço (sem reprocessar) |
+| 11 Página da API | ✅ concluída | 2026-07-03 | web/api.html com quickstart e exemplos reais |
 
 Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (explicar)
 
@@ -59,12 +59,12 @@ Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (e
 
 > **Nota metodológica a repassar à equipe**: os tempos médios da v2 NÃO são comparáveis aos da v1.1 — a v1.1 media a média até TODOS os serviços; a v2 mede até o MAIS PRÓXIMO por categoria, conforme a seção 2.3.2 do TCC. O texto do TCC deve ser atualizado com os números da v2 e uma frase explicando a correção metodológica.
 
-## Diagnóstico Moreno por cidade (Fase 09)
+## Diagnóstico Moreno por cidade (Fase 10)
 
 | Cidade | Minutos da Cidade | Cobertura Plena | Gargalo | Classificação |
 |---|---|---|---|---|
-| Águas de São Pedro | 35 min | 14.51% | Educação (escolas) | Distante do conceito |
-| Praia Grande | 179 min | 0.23% | Transporte (rodoviárias) | Distante do conceito |
+| Águas de São Pedro | 35 min | 12.30% | Educação (escolas) | Distante do conceito |
+| Praia Grande | 179 min | 0.22% | Transporte (rodoviárias) | Distante do conceito |
 
-## Resumo do Estado do Sistema (Fase 09)
-A plataforma de alcançabilidade urbana está totalmente implementada e funcional de ponta a ponta. O banco de dados PostgreSQL armazena as tabelas do modelo de dados do TCC, as isócronas em JSONB e a nova tabela `indice_moreno` com o diagnóstico territorial. O algoritmo em Python foi otimizado com Dijkstra multi-source e agora gera diagnósticos automáticos integrados no pipeline. A API REST pública suporta carregamento de novos locais sob demanda com polling de progresso e bypass do rate limiter, além do heatmap especial de cobertura plena. O frontend em Leaflet inclui o cartão dinâmico de Moreno com distribuição por histograma, visualização de cobertura agregada e comparação ampliada de cidades.
+## Resumo do Estado do Sistema (Fase 10)
+A plataforma de alcançabilidade urbana está totalmente implementada e funcional de ponta a ponta. O banco de dados PostgreSQL armazena as tabelas do modelo de dados do TCC, as isócronas em JSONB e a nova tabela `indice_moreno` com o diagnóstico territorial. O algoritmo em Python foi otimizado com Dijkstra multi-source e agora gera diagnósticos automáticos integrados no pipeline, incluindo as 4 novas categorias do catálogo (totalizando 12 categorias). A API REST pública suporta carregamento de novos locais sob demanda com polling de progresso e bypass do rate limiter, além do heatmap especial de cobertura plena e diagnóstico dinâmico via `GET /cidades/:id/moreno`. O frontend em Leaflet inclui o painel "Personalizar análise" com checkbox de categorias, seletor de velocidade e modal "Como calculamos?", habilitando a reconfiguração dinâmica em tempo real sem reprocessamento da cidade. Além disso, a documentação pública amigável e interativa da API está disponível em `/api.html`.

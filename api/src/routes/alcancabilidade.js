@@ -45,10 +45,25 @@ router.get('/', async (req, res, next) => {
   
   try {
     // 1. Valida se a cidade existe
-    const cityCheck = await pool.query("SELECT id FROM cidade WHERE id = $1", [cidadeId]);
+    const cityCheck = await pool.query("SELECT * FROM cidade WHERE id = $1", [cidadeId]);
     if (cityCheck.rowCount === 0) {
       return res.status(404).json({ erro: "Cidade nao encontrada", codigo: 404 });
     }
+    const city = cityCheck.rows[0];
+    const velBase = parseFloat(city.velocidade_kmh);
+    const limiar = parseFloat(city.limiar_minutos);
+
+    // Valida e aplica velocidade se fornecida
+    let velEscolhida = velBase;
+    const { velocidade } = req.query;
+    if (velocidade) {
+      const v = parseFloat(velocidade);
+      if (isNaN(v) || v < 2.0 || v > 6.0) {
+        return res.status(400).json({ erro: "A velocidade deve ser um numero entre 2.0 e 6.0", codigo: 400 });
+      }
+      velEscolhida = v;
+    }
+    const fator = velBase / velEscolhida;
     
     // 2. Busca o nó mais próximo com delta = 0.02
     let no = await encontrarNoMaisProximo(cidadeId, latitude, longitude, 0.02);
@@ -67,7 +82,7 @@ router.get('/', async (req, res, next) => {
     
     // 3. Busca alcançabilidade de todas as categorias para este nó
     const queryAlcancabilidade = `
-      SELECT cat.chave, cat.rotulo, cat.cor_hex, a.tempo_min, a.dentro_limiar,
+      SELECT cat.chave, cat.rotulo, cat.cor_hex, a.tempo_min,
              s.id AS servico_id, s.nome AS servico_nome, s.lat AS servico_lat, s.lon AS servico_lon,
              s.osm_no_id AS servico_osm_no_id
       FROM alcancabilidade_no a
@@ -89,12 +104,16 @@ router.get('/', async (req, res, next) => {
           osm_no_id: String(r.servico_osm_no_id)
         };
       }
+      
+      const tempoMinScaled = r.tempo_min !== null ? parseFloat(r.tempo_min) * fator : null;
+      const dentroLimiar = tempoMinScaled !== null ? (tempoMinScaled <= limiar) : false;
+
       return {
         chave: r.chave,
         rotulo: r.rotulo,
         cor_hex: r.cor_hex,
-        tempo_min: r.tempo_min !== null ? parseFloat(r.tempo_min) : null,
-        dentro_limiar: r.dentro_limiar,
+        tempo_min: tempoMinScaled !== null ? parseFloat(tempoMinScaled.toFixed(2)) : null,
+        dentro_limiar: dentroLimiar,
         servico_mais_proximo: servico
       };
     });
@@ -112,6 +131,7 @@ router.get('/', async (req, res, next) => {
         distancia_m: parseFloat(no.dist_m)
       },
       indice_ponto: parseFloat(indice_ponto.toFixed(2)),
+      velocidade_kmh_aplicada: velEscolhida,
       categorias
     });
   } catch (error) {

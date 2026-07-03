@@ -63,6 +63,11 @@ export function exibirResultadosPonto(dados) {
   }
   
   let html = `
+    <!-- Botão para voltar ao diagnóstico geral da cidade (Fase 09) -->
+    <button id="btn-voltar-moreno" class="btn-secundario" style="width: 100%; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      &larr; Diagnostico da Cidade
+    </button>
+
     <!-- Card de Índice Geral do Ponto -->
     <div class="index-badge">
       <span class="index-value">${idx.toFixed(0)}</span>
@@ -113,4 +118,12 @@ export function exibirResultadosPonto(dados) {
       }
     });
   });
+
+  // Listener para o botão de voltar ao diagnóstico da cidade (Fase 09)
+  const btnVoltar = panel.querySelector('#btn-voltar-moreno');
+  if (btnVoltar) {
+    btnVoltar.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('voltarAoDiagnostico'));
+    });
+  }
 }

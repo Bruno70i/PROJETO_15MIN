@@ -50,7 +50,9 @@ async function onMapaClick(e) {
     .openPopup();
     
   try {
-    const dados = await getAlcancabilidade(cidadeId, lat, lng);
+    const velSelect = document.getElementById('moreno-velocidade-select');
+    const velocidade = velSelect ? velSelect.value : '';
+    const dados = await getAlcancabilidade(cidadeId, lat, lng, velocidade);
     dados.cidade_id = cidadeId; // usado depois para tracar a rota real
     exibirResultadosPonto(dados);
   } catch (error) {
@@ -112,7 +114,9 @@ export async function mostrarCaminhoServico(cidadeId, origem, servico, corHex) {
   marcadoresServicos.push(marcadorServico);
 
   try {
-    const rota = await getRota(cidadeId, origem.osm_id, servico.osm_no_id);
+    const velSelect = document.getElementById('moreno-velocidade-select');
+    const velocidade = velSelect ? velSelect.value : '';
+    const rota = await getRota(cidadeId, origem.osm_id, servico.osm_no_id, velocidade);
 
     // Duas polylines sobrepostas: contorno branco embaixo (casing) e a cor
     // da categoria por cima — legível sobre qualquer fundo do mapa.
@@ -198,7 +202,7 @@ export function limparIsocronas() {
 }
 
 // Mostra o mapa de calor/camada de nós
-export async function toggleHeatmap(cidadeId, categoria, ativo) {
+export async function toggleHeatmap(cidadeId, categoria, ativo, velocidade = '', categorias = '') {
   if (camadaHeatmap) {
     mapa.removeLayer(camadaHeatmap);
     camadaHeatmap = null;
@@ -207,7 +211,7 @@ export async function toggleHeatmap(cidadeId, categoria, ativo) {
   if (!ativo) return;
   
   try {
-    const pontos = await getMapa(cidadeId, categoria, 3000);
+    const pontos = await getMapa(cidadeId, categoria, 3000, velocidade, categorias);
     
     // Escala de cores dos nós do heatmap
     // ≤5 min #1a9850, ≤10 #91cf60, ≤15 #d9ef8b, ≤25 #fee08b, >25 #d73027, null #999

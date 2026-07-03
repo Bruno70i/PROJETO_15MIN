@@ -14,6 +14,7 @@ import cidadesRouter from './routes/cidades.js';
 import isocronasRouter from './routes/isocronas.js';
 import alcancabilidadeRouter from './routes/alcancabilidade.js';
 import rotaRouter from './routes/rota.js';
+import processamentosRouter from './routes/processamentos.js';
 
 const app = express();
 
@@ -30,7 +31,8 @@ app.use(express.static(process.env.WEB_DIR || path.resolve(__dirname, '../../web
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // limite de 100 requisições
-  message: { erro: "Limite de requisicoes excedido. Tente novamente mais tarde.", codigo: 429 }
+  message: { erro: "Limite de requisicoes excedido. Tente novamente mais tarde.", codigo: 429 },
+  skip: (req) => req.originalUrl.startsWith('/api/v1/processamentos')
 });
 
 if (process.env.NODE_ENV !== 'test') {
@@ -104,6 +106,52 @@ app.get('/api/v1/comparar', async (req, res, next) => {
         pct_dentro_limiar: parseFloat(r.pct_dentro_limiar),
         indice: parseFloat(r.indice)
       }));
+
+      // Busca diagnóstico de Moreno (Fase 09)
+      const morenoRes = await pool.query(`
+        SELECT m.*,
+               cat.chave AS gargalo_chave,
+               cat.rotulo AS gargalo_rotulo,
+               cat.cor_hex AS gargalo_cor_hex
+        FROM indice_moreno m
+        LEFT JOIN categoria_servico cat ON cat.id = m.categoria_gargalo_id
+        WHERE m.cidade_id = $1
+      `, [cidId]);
+
+      let moreno = null;
+      if (morenoRes.rows.length > 0) {
+        const m = morenoRes.rows[0];
+        const ausentesIds = m.categorias_ausentes || [];
+        let categorias_ausentes = [];
+        if (ausentesIds.length > 0) {
+          const ausRes = await pool.query(`
+            SELECT chave, rotulo
+            FROM categoria_servico
+            WHERE id = ANY($1)
+            ORDER BY id ASC
+          `, [ausentesIds]);
+          categorias_ausentes = ausRes.rows.map(r => ({ chave: r.chave, rotulo: r.rotulo }));
+        }
+
+        moreno = {
+          limiar_minutos: m.limiar_minutos,
+          pct_cobertura_plena: parseFloat(m.pct_cobertura_plena),
+          minutos_cidade: m.minutos_cidade,
+          tempo_pior_medio: m.tempo_pior_medio !== null ? parseFloat(m.tempo_pior_medio) : null,
+          tempo_pior_mediana: m.tempo_pior_mediana !== null ? parseFloat(m.tempo_pior_mediana) : null,
+          pct_nos_sem_cobertura: parseFloat(m.pct_nos_sem_cobertura),
+          atende_conceito: m.atende_conceito,
+          classificacao: m.classificacao,
+          categoria_gargalo: m.categoria_gargalo_id ? {
+            chave: m.gargalo_chave,
+            rotulo: m.gargalo_rotulo,
+            cor_hex: m.gargalo_cor_hex
+          } : null,
+          pct_gargalo: m.pct_gargalo !== null ? parseFloat(m.pct_gargalo) : null,
+          categorias_ausentes,
+          distribuicao: m.distribuicao
+        };
+      }
       
       resultados.push({
         cidade: {
@@ -115,7 +163,8 @@ app.get('/api/v1/comparar', async (req, res, next) => {
           qtd_nos: c.qtd_nos,
           limiar_minutos: c.limiar_minutos
         },
-        indices
+        indices,
+        moreno
       });
     }
     res.json(resultados);
@@ -129,6 +178,7 @@ app.use('/api/v1/cidades', cidadesRouter);
 app.use('/api/v1/cidades', isocronasRouter); // Rota /cidades/:id/isocronas está neste router
 app.use('/api/v1/alcancabilidade', alcancabilidadeRouter);
 app.use('/api/v1/rota', rotaRouter);
+app.use('/api/v1/processamentos', processamentosRouter);
 
 // Handler 404
 app.use((req, res, next) => {

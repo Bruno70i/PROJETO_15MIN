@@ -59,6 +59,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
+  /cidades/{id}/moreno:
+    get:
+      summary: Diagnóstico Moreno Dinâmico da cidade (Fase 10)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categorias
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "saude,educacao,mercado"
+        - name: velocidade
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 2.0
+            maximum: 6.0
+            example: 4.5
+      responses:
+        '200':
+          description: Diagnóstico Moreno recalculado dinamicamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MorenoDinamico'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Cidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /cidades/{id}/servicos:
     get:
       summary: Retorna serviços mapeados na cidade em formato GeoJSON
@@ -180,6 +222,19 @@ paths:
           schema:
             type: integer
             default: 3000
+        - name: velocidade
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 2.0
+            maximum: 6.0
+        - name: categorias
+          in: query
+          required: false
+          schema:
+            type: string
+            description: CSV de chaves de categorias (usado com categoria=plena)
       responses:
         '200':
           description: Amostra de pontos para renderização de calor
@@ -222,6 +277,13 @@ paths:
           required: true
           schema:
             type: number
+        - name: velocidade
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 2.0
+            maximum: 6.0
       responses:
         '200':
           description: Detalhes do nó mais próximo e tempos de acesso
@@ -261,6 +323,9 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/IndiceCategoria'
+                    moreno:
+                      $ref: '#/components/schemas/Moreno'
+                      nullable: true
         '400':
           description: Mais de 5 cidades solicitadas ou IDs inválidos
           content:
@@ -295,6 +360,13 @@ paths:
           schema:
             type: string
           example: "633283351"
+        - name: velocidade
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 2.0
+            maximum: 6.0
       responses:
         '200':
           description: Rota encontrada
@@ -334,6 +406,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
+  /processamentos:
+    post:
+      summary: Dispara o processamento de uma nova cidade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consulta_osm:
+                  type: string
+                  example: "Santos, São Paulo, Brazil"
+              required:
+                - consulta_osm
+      responses:
+        '202':
+          description: Processamento iniciado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  consulta_osm:
+                    type: string
+                  status:
+                    type: string
+                    example: "rodando"
+        '200':
+          description: Cidade já processada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ja_processada:
+                    type: boolean
+                    example: true
+                  cidade_id:
+                    type: integer
+                    example: 10
+        '400':
+          description: Parâmetro inválido ou injeção de parâmetros detectada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '409':
+          description: Já existe um processamento em andamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /processamentos/atual:
+    get:
+      summary: Retorna o progresso do job atual em andamento ou último concluído
+      responses:
+        '200':
+          description: Status do job de processamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                      consulta_osm:
+                        type: string
+                      status:
+                        type: string
+                        example: "rodando"
+                      pct:
+                        type: integer
+                        example: 45
+                      etapa:
+                        type: string
+                        example: "calculo"
+                      msg:
+                        type: string
+                        example: "Calculando alcancabilidade para saude"
+                      iniciadoEm:
+                        type: string
+                        format: date-time
+                      terminadoEm:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      cidadeId:
+                        type: integer
+                        nullable: true
+                      codigoSaida:
+                        type: integer
+                        nullable: true
 components:
   schemas:
     CidadeResumida:
@@ -395,6 +566,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/IndiceCategoria'
+        moreno:
+          $ref: '#/components/schemas/Moreno'
+          nullable: true
     IndiceCategoria:
       type: object
       properties:
@@ -477,3 +651,168 @@ components:
         codigo:
           type: integer
           example: 404
+    Moreno:
+      type: object
+      properties:
+        limiar_minutos:
+          type: integer
+          example: 15
+        pct_cobertura_plena:
+          type: number
+          example: 78.45
+        minutos_cidade:
+          type: integer
+          nullable: true
+          example: 22
+        tempo_pior_medio:
+          type: number
+          nullable: true
+          example: 18.23
+        tempo_pior_mediana:
+          type: number
+          nullable: true
+          example: 16.50
+        pct_nos_sem_cobertura:
+          type: number
+          example: 12.30
+        atende_conceito:
+          type: boolean
+          example: false
+        classificacao:
+          type: string
+          example: "Parcialmente aderente"
+        categoria_gargalo:
+          type: object
+          nullable: true
+          properties:
+            chave:
+              type: string
+              example: "saude"
+            rotulo:
+              type: string
+              example: "Saúde (hospitais)"
+            cor_hex:
+              type: string
+              example: "#e74c3c"
+        pct_gargalo:
+          type: number
+          nullable: true
+          example: 45.20
+        categorias_ausentes:
+          type: array
+          items:
+            type: object
+            properties:
+              chave:
+                type: string
+              rotulo:
+                type: string
+        distribuicao:
+          type: array
+          items:
+            type: object
+            properties:
+              faixa:
+                type: string
+                example: "0-5"
+              qtd:
+                type: integer
+                example: 125
+    MorenoDinamico:
+      type: object
+      properties:
+        limiar_minutos:
+          type: integer
+          example: 15
+        pct_cobertura_plena:
+          type: number
+          example: 78.45
+        minutos_cidade:
+          type: integer
+          nullable: true
+          example: 22
+        tempo_pior_medio:
+          type: number
+          nullable: true
+          example: 18.23
+        tempo_pior_mediana:
+          type: number
+          nullable: true
+          example: 16.50
+        pct_nos_sem_cobertura:
+          type: number
+          example: 12.30
+        atende_conceito:
+          type: boolean
+          example: false
+        classificacao:
+          type: string
+          example: "Parcialmente aderente"
+        categoria_gargalo:
+          type: object
+          nullable: true
+          properties:
+            chave:
+              type: string
+              example: "saude"
+            rotulo:
+              type: string
+              example: "Saúde (hospitais)"
+            cor_hex:
+              type: string
+              example: "#e74c3c"
+        pct_gargalo:
+          type: number
+          nullable: true
+          example: 45.20
+        categorias_ausentes:
+          type: array
+          items:
+            type: object
+            properties:
+              chave:
+                type: string
+              rotulo:
+                type: string
+        distribuicao:
+          type: array
+          items:
+            type: object
+            properties:
+              faixa:
+                type: string
+                example: "0-5"
+              qtd:
+                type: integer
+                example: 125
+        categorias_resultado:
+          type: array
+          items:
+            type: object
+            properties:
+              chave:
+                type: string
+                example: "saude"
+              rotulo:
+                type: string
+                example: "Saúde (hospitais)"
+              cor_hex:
+                type: string
+                example: "#e74c3c"
+              pct_dentro:
+                type: number
+                example: 85.20
+        parametros:
+          type: object
+          properties:
+            categorias_usadas:
+              type: array
+              items:
+                type: string
+                example: "saude"
+            velocidade_kmh:
+              type: number
+              example: 4.5
+            dinamico:
+              type: boolean
+              example: true

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API de Alcançabilidade Urbana — Cidade de 15 Minutos</title>
+  <link rel="stylesheet" href="css/estilo.css">
+  <style>
+    .api-container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 30px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      line-height: 1.6;
+    }
+    
+    .api-container h2, .api-container h3, .api-container h4 {
+      color: var(--primary-color);
+      margin-bottom: 15px;
+      margin-top: 25px;
+    }
+    
+    .api-container h2:first-of-type {
+      margin-top: 0;
+    }
+    
+    .api-container p {
+      margin-bottom: 15px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+
+    .hero-section {
+      text-align: center;
+      padding: 30px 20px;
+      background-color: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-bottom: 40px;
+    }
+
+    .hero-section h2 {
+      margin-top: 0;
+    }
+
+    .code-box-wrapper {
+      position: relative;
+      margin: 15px 0;
+    }
+
+    .code-box {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: #334155;
+      color: #f8fafc;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .copy-btn:hover {
+      background-color: #475569;
+    }
+
+    /* Tabs para Quickstart */
+    .tabs-container {
+      margin: 25px 0;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .tabs-header {
+      display: flex;
+      background-color: #f1f5f9;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      background: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .tab-btn:hover {
+      background-color: #e2e8f0;
+      color: var(--primary-color);
+    }
+
+    .tab-btn.active {
+      background-color: #ffffff;
+      color: var(--primary-color);
+      border-bottom: 2px solid var(--primary-color);
+    }
+
+    .tab-content {
+      padding: 15px;
+      display: none;
+      background-color: #ffffff;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Cards de Conceitos */
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin: 25px 0;
+    }
+
+    .concept-card {
+      background-color: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 15px;
+    }
+
+    .concept-card strong {
+      display: block;
+      color: var(--primary-color);
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    /* Tabela de Referência */
+    .ref-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.85rem;
+    }
+
+    .ref-table th, .ref-table td {
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      text-align: left;
+    }
+
+    .ref-table th {
+      background-color: #f1f5f9;
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    .method-tag {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: white;
+      display: inline-block;
+    }
+
+    .method-tag.get { background-color: #10b981; }
+    .method-tag.post { background-color: #3b82f6; }
+
+    /* Estilo de Diagrama */
+    .diagram-box {
+      font-family: monospace;
+      background-color: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      padding: 15px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header class="header-bar">
+    <div class="brand">
+      <h1>Cidade de 15 Minutos</h1>
+    </div>
+    
+    <div class="controls">
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="index.html">Mapa</a>
+        <a href="comparar.html">Comparar</a>
+        <a href="sobre.html">Sobre</a>
+        <a href="api.html" class="active">API</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Container de Conteúdo -->
+  <main class="api-container">
+    <div class="hero-section">
+      <h2>API de Alcançabilidade Urbana</h2>
+      <p style="color:#64748b; font-size:0.95rem;">
+        Integre indicadores espaciais da Cidade de 15 Minutos e cálculo de rotas pela malha viária nos seus próprios projetos.
+      </p>
+      
+      <div class="code-box-wrapper" style="max-width: 500px; margin: 15px auto;">
+        <pre class="code-box">http://localhost:3000/api/v1</pre>
+        <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+      </div>
+      
+      <div style="display:flex; justify-content:center; gap:10px; margin-top:20px;">
+        <a href="/api/docs" target="_blank" class="btn-primario" style="text-decoration:none;">Documentação Interativa (Swagger)</a>
+        <a href="#quickstart" class="btn-secundario" style="text-decoration:none;">Testar Agora (Quickstart)</a>
+      </div>
+    </div>
+
+    <h3 id="quickstart">Comece em 1 minuto (Quickstart)</h3>
+    <p>Escolha a sua tecnologia preferida e execute a chamada para buscar as cidades disponíveis e consultar um ponto de alcançabilidade:</p>
+
+    <!-- Tabs Container -->
+    <div class="tabs-container">
+      <div class="tabs-header">
+        <button class="tab-btn active" onclick="switchTab(event, 'tab-curl')">cURL</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-js')">JavaScript (Fetch)</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-python')">Python (Requests)</button>
+      </div>
+
+      <div id="tab-curl" class="tab-content active">
+        <div class="code-box-wrapper">
+          <pre class="code-box"># 1. Listar todas as cidades processadas no banco
+curl -X GET "http://localhost:3000/api/v1/cidades"
+
+# 2. Consultar o tempo de alcançabilidade no centro de Águas de São Pedro
+curl -X GET "http://localhost:3000/api/v1/alcancabilidade?cidade_id=21&lat=-22.609922&lon=-47.864508"</pre>
+          <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+        </div>
+      </div>
+
+      <div id="tab-js" class="tab-content">
+        <div class="code-box-wrapper">
+          <pre class="code-box">// Consultar cidades cadastradas e seus índices de alcançabilidade
+async function testarAPI() {
+  const resCidades = await fetch('http://localhost:3000/api/v1/cidades');
+  const cidades = await resCidades.json();
+  console.log('Cidades:', cidades);
+
+  if (cidades.length > 0) {
+    const resPonto = await fetch(`http://localhost:3000/api/v1/alcancabilidade?cidade_id=${cidades[0].id}&lat=-22.6099&lon=-47.8645`);
+    const dados = await resPonto.json();
+    console.log('Dados do Ponto Clicado:', dados);
+  }
+}
+testarAPI();</pre>
+          <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+        </div>
+      </div>
+
+      <div id="tab-python" class="tab-content">
+        <div class="code-box-wrapper">
+          <pre class="code-box">import requests
+
+# 1. Lista cidades
+cidades = requests.get("http://localhost:3000/api/v1/cidades").json()
+print("Cidades disponíveis:", len(cidades))
+
+if cidades:
+    cidade_id = cidades[0]['id']
+    # 2. Consulta o ponto de alcançabilidade
+    params = {"cidade_id": cidade_id, "lat": -22.6099, "lon": -47.8645}
+    dados_ponto = requests.get("http://localhost:3000/api/v1/alcancabilidade", params=params).json()
+    print("Índice de alcançabilidade do ponto:", dados_ponto['indice_ponto'])</pre>
+          <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+        </div>
+      </div>
+    </div>
+
+    <h3>Conceitos em 30 segundos</h3>
+    <div class="concepts-grid">
+      <div class="concept-card">
+        <strong>Cidade</strong>
+        Representa a área territorial urbana delimitada no OpenStreetMap cujos serviços e nós foram baixados e processados.
+      </div>
+      <div class="concept-card">
+        <strong>Nó (Node)</strong>
+        Uma interseção viária real (esquina ou junção de vias de pedestres) gerada a partir da malha viária do OSM.
+      </div>
+      <div class="concept-card">
+        <strong>Categoria</strong>
+        Tipos de serviços essenciais. Chaves válidas: <code>saude</code>, <code>farmacia</code>, <code>educacao</code>, <code>mercado</code>, <code>transporte</code>, <code>banco</code>, <code>combustivel</code>, <code>lazer</code>, <code>ponto_onibus</code>, <code>posto_saude</code>, <code>creche</code>, <code>padaria</code>.
+      </div>
+      <div class="concept-card">
+        <strong>Índice</strong>
+        Métrica de 0 a 100 calculada sobre a proporção de categorias que podem ser acessadas a pé no limiar de tempo de 15 minutos.
+      </div>
+    </div>
+
+    <h3>Referência de Endpoints</h3>
+    <table class="ref-table">
+      <thead>
+        <tr>
+          <th>Método</th>
+          <th>Caminho</th>
+          <th>Descrição</th>
+          <th>Parâmetros da Query</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/saude</code></td>
+          <td>Health check da API e do banco de dados</td>
+          <td>Nenhum</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades</code></td>
+          <td>Lista as cidades processadas e seus índices consolidados</td>
+          <td>Nenhum</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades/{id}</code></td>
+          <td>Detalhes e índices de alcançabilidade de uma cidade</td>
+          <td>Nenhum</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades/{id}/servicos</code></td>
+          <td>Retorna pontos de serviços mapeados (GeoJSON)</td>
+          <td><code>categoria</code> (opcional)</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades/{id}/isocronas</code></td>
+          <td>Gera o polígono da isócrona de acesso para a categoria</td>
+          <td><code>categoria</code> (obrigatório), <code>minutos</code> (default 15)</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades/{id}/mapa</code></td>
+          <td>Retorna nós amostrais da cidade para mapa de calor</td>
+          <td><code>categoria</code> (obrigatório), <code>max</code> (default 3000), <code>velocidade</code>, <code>categorias</code></td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/cidades/{id}/moreno</code></td>
+          <td>Diagnóstico de Moreno dinâmico e flexível (Fase 10)</td>
+          <td><code>categorias</code> (CSV opcional), <code>velocidade</code> (opcional)</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/alcancabilidade</code></td>
+          <td>Calcula tempos de alcançabilidade a partir de lat/lon</td>
+          <td><code>cidade_id</code> (obrigatório), <code>lat</code> (obrigatório), <code>lon</code> (obrigatório), <code>velocidade</code></td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/rota</code></td>
+          <td>Traça rota real a pé pela malha viária viária (GeoJSON)</td>
+          <td><code>cidade_id</code> (obrigatório), <code>de</code> (nó inicial), <code>para</code> (nó final), <code>velocidade</code></td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/comparar</code></td>
+          <td>Compara os índices consolidados de até 5 cidades</td>
+          <td><code>cidades</code> (CSV de IDs)</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag post">POST</span></td>
+          <td><code>/processamentos</code></td>
+          <td>Dispara o processamento de um novo município no OSM</td>
+          <td>Nenhum (Envio do body JSON com <code>consulta_osm</code>)</td>
+        </tr>
+        <tr>
+          <td><span class="method-tag get">GET</span></td>
+          <td><code>/processamentos/atual</code></td>
+          <td>Retorna o progresso do processamento em andamento</td>
+          <td>Nenhum</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Exemplos Reais de Respostas da API</h3>
+
+    <h4>GET <code>/api/v1/cidades/21/moreno?velocidade=4.5</code></h4>
+    <p>O endpoint de Moreno dinâmico permite simular e filtrar categorias na hora:</p>
+    <div class="code-box-wrapper">
+      <pre class="code-box">{
+  "limiar_minutos": 15,
+  "pct_cobertura_plena": 23.45,
+  "minutos_cidade": 28,
+  "tempo_pior_medio": 18.3,
+  "tempo_pior_mediana": 15.2,
+  "pct_nos_sem_cobertura": 2.15,
+  "atende_conceito": false,
+  "classificacao": "Parcialmente aderente",
+  "categoria_gargalo": {
+    "chave": "educacao",
+    "rotulo": "Educação (escolas)",
+    "cor_hex": "#3498db"
+  },
+  "pct_gargalo": 45.12,
+  "categorias_ausentes": [],
+  "distribuicao": [
+    { "faixa": "0_5", "qtd": 152 },
+    { "faixa": "5_10", "qtd": 204 },
+    { "faixa": "10_15", "qtd": 401 },
+    { "faixa": "sem_cobertura", "qtd": 32 }
+  ],
+  "parametros": {
+    "categorias_usadas": [
+      "saude",
+      "farmacia",
+      "educacao",
+      "mercado",
+      "transporte",
+      "banco",
+      "combustivel",
+      "lazer"
+    ],
+    "velocidade_kmh": 4.5,
+    "dinamico": true
+  }
+}</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+
+    <h4>GET <code>/api/v1/alcancabilidade?cidade_id=21&lat=-22.6099&lon=-47.8645</code></h4>
+    <p>Detalha a alcançabilidade do nó da malha viária mais próximo das coordenadas informadas:</p>
+    <div class="code-box-wrapper">
+      <pre class="code-box">{
+  "no": {
+    "osm_id": 1800922841,
+    "lat": -22.609922,
+    "lon": -47.864508,
+    "distancia_m": 12.4
+  },
+  "indice_ponto": 75.0,
+  "velocidade_kmh_aplicada": 3.0,
+  "categorias": [
+    {
+      "chave": "saude",
+      "rotulo": "Saúde (hospitais)",
+      "cor_hex": "#e74c3c",
+      "tempo_min": 10.2,
+      "dentro_limiar": true,
+      "servico_mais_proximo": {
+        "id": 12,
+        "nome": "Centro Médico Central",
+        "lat": -22.612,
+        "lon": -47.876,
+        "osm_no_id": "2111179253"
+      }
+    }
+  ]
+}</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+
+    <h3>Receita Completa: Desenhar Isócronas com Leaflet</h3>
+    <p>Exemplo estático completo que consome a API do projeto local e plota a isócrona no mapa Leaflet. Copie, salve como <code>mapa.html</code> e abra no navegador:</p>
+    <div class="code-box-wrapper">
+      <pre class="code-box">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /&gt;
+  &lt;script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"&gt;&lt;/script&gt;
+  &lt;style&gt;#map { height: 400px; width: 100%; border-radius: 8px; }&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h3&gt;Visualizador de Isocronas a pe&lt;/h3&gt;
+  &lt;div id="map"&gt;&lt;/div&gt;
+  &lt;script&gt;
+    const map = L.map('map').setView([-22.6099, -47.8645], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Consome o polígono da isócrona de lazer para a cidade de Águas de São Pedro (ID: 21)
+    fetch('http://localhost:3000/api/v1/cidades/21/isocronas?categoria=lazer&minutos=15')
+      .then(res => res.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: { color: '#2ecc71', fillColor: '#2ecc71', fillOpacity: 0.2 }
+        }).addTo(map);
+      })
+      .catch(err => console.error("Erro ao carregar isocrona:", err));
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+
+    <h3>Adicionar uma Cidade via API</h3>
+    <p>Para adicionar novas cidades programaticamente à plataforma, siga o fluxo de execução abaixo:</p>
+    <div class="diagram-box">
+POST /api/v1/processamentos (com {"consulta_osm": "Guarujá, SP"})
+            │
+            ▼ Retorna 202 Accepted {"id": "job-uuid"}
+┌──────────────────────────────────────────────┐
+│ Loop de Polling a cada 2s                    │
+│ GET /api/v1/processamentos/atual             │
+│   ├── Se job.status === "rodando" -> continua│
+│   └── Se job.status === "concluido" -> fim   │
+└──────────────────────────────────────────────┘
+            │
+            ▼
+Cidade disponível em GET /api/v1/cidades
+    </div>
+
+    <div class="code-box-wrapper">
+      <pre class="code-box">// Exemplo de script de processamento e polling
+async function processarCidade(consulta) {
+  const postRes = await fetch('http://localhost:3000/api/v1/processamentos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ consulta_osm: consulta })
+  });
+  
+  const postData = await postRes.json();
+  if (postRes.status === 200) {
+    console.log("Cidade já existe! ID:", postData.cidade_id);
+    return;
+  }
+  
+  const jobId = postData.id;
+  console.log("Processamento iniciado. Job ID:", jobId);
+
+  const timer = setInterval(async () => {
+    const pollRes = await fetch('http://localhost:3000/api/v1/processamentos/atual');
+    const pollData = await pollRes.json();
+    const job = pollData.job;
+
+    if (!job || job.id !== jobId) {
+      clearInterval(timer);
+      console.log("Job cancelado ou modificado no servidor.");
+      return;
+    }
+
+    console.log(`Progresso: ${job.pct}% | ${job.msg}`);
+
+    if (job.status === 'concluido') {
+      clearInterval(timer);
+      console.log("Concluído! Nova Cidade ID:", job.cidadeId);
+    } else if (job.status === 'erro') {
+      clearInterval(timer);
+      console.log("Erro no processamento:", job.msg);
+    }
+  }, 2000);
+}</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+
+    <h3>Boas Práticas e Limites</h3>
+    <ul>
+      <li><strong>Limitação de Requisições (Rate Limit):</strong> A API restringe o acesso a no máximo <strong>100 requisições por IP a cada 15 minutos</strong>. Endpoints de progresso em tempo real (/processamentos/atual) e de listagem geral de cidades estão isentos dessas regras para evitar quedas no monitoramento.</li>
+      <li><strong>CORS Aberto:</strong> Cabeçalhos CORS estão configurados para permitir leitura a partir de qualquer domínio, facilitando integrações baseadas inteiramente no lado do cliente.</li>
+      <li><strong>Erros e Respostas:</strong> Chamadas com erro retornam objetos JSON estruturados no formato: <code>{"erro": "Mensagem detalhada", "codigo": 404}</code>.</li>
+    </ul>
+
+    <h3>Licenças, Atribuição e Citação Acadêmica</h3>
+    <p>
+      Todos os dados analíticos espaciais gerados são derivados do mapeamento voluntário do OpenStreetMap. Qualquer projeto comercial, acadêmico ou comunitário que utilize esta API <strong>deve exibir obrigatoriamente</strong> a seguinte atribuição nas telas de visualização dos mapas:
+    </p>
+    <div class="code-box-wrapper">
+      <pre class="code-box">Dados Geográficos © colaboradores do OpenStreetMap sob licença ODbL. Índices calculados pela plataforma Cidade de 15 Minutos (UNIP, 2026).</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+
+    <p style="margin-top:20px;">Para citações acadêmicas desta metodologia de alcançabilidade, sugere-se a referência abaixo:</p>
+    <div class="code-box-wrapper">
+      <pre class="code-box">NASCIMENTO, B.; ROCHA, G.; JESUS, P. H. Mensuração Computacional de Alcançabilidade Urbana: Cidade de 15 Minutos. 2026. Trabalho de Conclusão de Curso (Graduação em Engenharia/Ciência da Computação) - Universidade Paulista (UNIP), São Paulo, 2026.</pre>
+      <button class="copy-btn" onclick="copiarCodigo(this)">Copiar</button>
+    </div>
+  </main>
+
+  <script>
+    function copiarCodigo(btn) {
+      const wrapper = btn.closest('.code-box-wrapper');
+      const codeEl = wrapper.querySelector('.code-box');
+      const text = codeEl.innerText || codeEl.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.innerText = 'Copiado!';
+        setTimeout(() => btn.innerText = 'Copiar', 2000);
+      }).catch(err => {
+        console.error('Erro ao copiar:', err);
+      });
+    }
+
+    function switchTab(evt, tabId) {
+      const container = evt.target.closest('.tabs-container');
+      
+      // Desativa todos os botões e abas
+      container.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      container.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      // Ativa o botão clicado e a aba correspondente
+      evt.target.classList.add('active');
+      container.querySelector('#' + tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>

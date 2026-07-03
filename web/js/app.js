@@ -1,9 +1,16 @@
-import { getCidades, getCidadeDetalhe, getMapa } from './api.js';
+import { getCidades, getCidadeDetalhe, getMapa, getMoreno } from './api.js';
 import { inicializarMapa, centralizarMapa, limparElementosMapa, toggleIsocrona, toggleHeatmap, limparIsocronas } from './mapa.js';
 import { limparPainelLateral, mostrarToast } from './painel.js';
 
 let cidadeAtualDetalhada = null;
 let legendaHeatmap = null;
+let pollingIntervalId = null;
+let activeJobId = null;
+
+// Fase 10: Variáveis de estado da análise dinâmica
+let velocidadeAtual = 3.0;
+let categoriasAtivas = new Set();
+let categoriaHeatmapAtiva = null; // Categoria do heatmap ativa no clique ("Cobertura por serviço")
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializa Mapa
@@ -11,40 +18,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 2. Carrega Cidades
   const selectCidade = document.getElementById('cidade-select');
-  try {
-    const cidades = await getCidades();
-    selectCidade.innerHTML = '';
-    
-    if (cidades.length === 0) {
-      selectCidade.innerHTML = '<option value="0">Nenhuma cidade processada</option>';
-      document.getElementById('panel-results').innerHTML = `
-        <p style="text-align:center; color:#ef4444; font-weight:600; padding:20px;">
-          Nenhuma cidade processada ainda. Rode o algoritmo (fase 03) para carregar os dados no banco.
-        </p>
-      `;
-      return;
-    }
-    
-    // Adiciona opção default
-    const optDefault = document.createElement('option');
-    optDefault.value = '0';
-    optDefault.innerText = 'Selecione uma cidade...';
-    selectCidade.appendChild(optDefault);
-    
-    cidades.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.innerText = `${c.nome} (${c.pais})`;
-      selectCidade.appendChild(opt);
-    });
-  } catch (error) {
-    selectCidade.innerHTML = '<option value="0">Erro ao carregar cidades</option>';
-    mostrarToast("Nao foi possivel conectar a API. Certifique-se de que o servidor esta rodando.");
-  }
-  
+  await carregarCidades();
+
   // 3. Evento de Seleção de Cidade
   selectCidade.addEventListener('change', async () => {
-    const cidadeId = parseInt(selectCidade.value, 10);
+    const cidadeIdVal = selectCidade.value;
+    
+    if (cidadeIdVal === '__nova__') {
+      // Restaura o select para a opção anterior ou 0
+      selectCidade.value = cidadeAtualDetalhada ? cidadeAtualDetalhada.id.toString() : '0';
+      abrirModalNovaCidade();
+      return;
+    }
+
+    const cidadeId = parseInt(cidadeIdVal, 10);
     
     // Limpar tudo
     limparElementosMapa();
@@ -60,11 +47,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
       cidadeAtualDetalhada = await getCidadeDetalhe(cidadeId);
+      
+      // Inicializa estados dinâmicos (Fase 10)
+      velocidadeAtual = parseFloat(cidadeAtualDetalhada.velocidade_kmh);
+      categoriasAtivas = new Set(cidadeAtualDetalhada.indices.map(i => i.chave).filter(k => k !== 'geral'));
+      categoriaHeatmapAtiva = null; // Reseta heatmap por serviço
 
-      // Centraliza na cidade a partir de um nó de amostra. A categoria 'geral'
-      // (id 0) é sentinela do índice agregado e não é aceita pelo /mapa —
-      // usa-se a primeira categoria real. Falha na centralização não pode
-      // impedir a montagem dos filtros, por isso o try separado.
+      // Centraliza na cidade
       try {
         const primeiraCategoria = cidadeAtualDetalhada.indices.find(i => i.chave !== 'geral');
         if (primeiraCategoria) {
@@ -84,6 +73,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Popula select do heatmap
       const selectHeatmap = document.getElementById('heatmap-categoria-select');
       selectHeatmap.innerHTML = '<option value="">Escolha a categoria...</option>';
+      
+      // Opção especial "Cobertura plena" (Fase 09)
+      const optPlena = document.createElement('option');
+      optPlena.value = 'plena';
+      optPlena.innerText = 'Cobertura plena (todos os servicos)';
+      selectHeatmap.appendChild(optPlena);
+
       selectHeatmap.disabled = false;
       
       cidadeAtualDetalhada.indices.forEach(idx => {
@@ -116,6 +112,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           toggleIsocrona(cidadeId, categoria, minutos, chk.checked, cor);
         });
       });
+
+      // Exibe Cartão de Diagnóstico de Moreno (Fase 09 & 10)
+      await exibirDiagnosticoMoreno();
       
     } catch (error) {
       mostrarToast("Erro ao carregar detalhes da cidade.");
@@ -124,9 +123,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 4. Seletor de Minutos das Isócronas
   document.getElementById('isocrona-minutos-select').addEventListener('change', () => {
-    const selectCidade = document.getElementById('cidade-select');
     const cidadeId = parseInt(selectCidade.value, 10);
-    if (cidadeId === 0) return;
+    if (isNaN(cidadeId) || cidadeId === 0) return;
     
     // Atualiza todas as isócronas ativas para o novo tempo
     document.querySelectorAll('.isocrona-checkbox').forEach(chk => {
@@ -145,10 +143,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   const updateHeatmap = () => {
     const cidadeId = parseInt(selectCidade.value, 10);
+    if (isNaN(cidadeId) || cidadeId === 0) return;
     const cat = heatmapSelect.value;
     const ativo = heatmapToggle.checked && cat !== '';
     
-    toggleHeatmap(cidadeId, cat, ativo);
+    // Se a categoria for plena, passamos as categoriasAtivas
+    const catList = cat === 'plena' ? Array.from(categoriasAtivas).join(',') : '';
+    
+    toggleHeatmap(cidadeId, cat, ativo, velocidadeAtual, catList);
     
     if (ativo) {
       adicionarLegendaHeatmap(map);
@@ -160,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   heatmapToggle.addEventListener('change', updateHeatmap);
   heatmapSelect.addEventListener('change', updateHeatmap);
   
-  // 6. Colapso do painel lateral (responsividade / interatividade)
+  // 6. Colapso do painel lateral
   const sidePanel = document.querySelector('.side-panel');
   const togglePanelBtn = document.getElementById('toggle-panel-btn');
   
@@ -172,9 +174,525 @@ document.addEventListener('DOMContentLoaded', async () => {
       togglePanelBtn.innerText = 'Ocultar';
     }
   });
+
+  // 7. Escuta o evento de voltar ao diagnóstico (Fase 09)
+  document.addEventListener('voltarAoDiagnostico', () => {
+    limparElementosMapa();
+    exibirDiagnosticoMoreno();
+  });
+
+  // 8. Eventos do Modal de Processamento (Fase 08)
+  document.getElementById('modal-close-btn').addEventListener('click', fecharModal);
+  document.getElementById('modal-cancelar-btn').addEventListener('click', fecharModal);
+  document.getElementById('modal-processar-btn').addEventListener('click', submeterNovaCidade);
+  document.getElementById('modal-result-close-btn').addEventListener('click', fecharModal);
+  document.getElementById('modal-minimizar-btn').addEventListener('click', minimizarModal);
+  document.getElementById('badge-processamento-bg').addEventListener('click', reabrirModalBackground);
+
+  // Verifica na inicialização se há um job ativo rodando
+  verificarJobAtivoAoCarregar();
+
+  // Função auxiliar para carregar cidades
+  async function carregarCidades() {
+    try {
+      const cidades = await getCidades();
+      selectCidade.innerHTML = '';
+      
+      if (cidades.length === 0) {
+        selectCidade.innerHTML = '<option value="0">Nenhuma cidade processada</option>';
+        document.getElementById('panel-results').innerHTML = `
+          <p style="text-align:center; color:#ef4444; font-weight:600; padding:20px;">
+            Nenhuma cidade processada ainda. Adicione uma nova cidade ou rode o algoritmo.
+          </p>
+        `;
+      } else {
+        const optDefault = document.createElement('option');
+        optDefault.value = '0';
+        optDefault.innerText = 'Selecione uma cidade...';
+        selectCidade.appendChild(optDefault);
+        
+        cidades.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.innerText = `${c.nome} (${c.pais})`;
+          selectCidade.appendChild(opt);
+        });
+      }
+      
+      // Adiciona a opção de processamento
+      const optNova = document.createElement('option');
+      optNova.value = '__nova__';
+      optNova.innerText = '+ Adicionar nova cidade...';
+      selectCidade.appendChild(optNova);
+
+    } catch (error) {
+      selectCidade.innerHTML = '<option value="0">Erro ao carregar cidades</option>';
+      mostrarToast("Nao foi possivel conectar a API para carregar cidades.");
+    }
+  }
+
+  // Renderiza o Cartão de Diagnóstico de Moreno no painel lateral (Fase 09 & 10)
+  async function exibirDiagnosticoMoreno() {
+    const panel = document.getElementById('panel-results');
+    if (!panel || !cidadeAtualDetalhada) return;
+
+    // Coloca spinner/esqueleto de carregamento enquanto busca dados dinâmicos
+    panel.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px 0;">
+        <div class="spinner"></div>
+        <p style="color:#64748b; font-size:0.85rem; margin-top:10px;">Calculando diagnostico dinamico...</p>
+      </div>
+    `;
+
+    try {
+      const catList = Array.from(categoriasAtivas).join(',');
+      const moreno = await getMoreno(cidadeAtualDetalhada.id, {
+        velocidade: velocidadeAtual,
+        categorias: catList
+      });
+
+      const isPersonalizado = (velocidadeAtual !== parseFloat(cidadeAtualDetalhada.velocidade_kmh)) || 
+                              (categoriasAtivas.size !== cidadeAtualDetalhada.indices.filter(i => i.chave !== 'geral').length);
+
+      // Cores de status de acordo com a classificação
+      let classeCor = 'vermelho';
+      if (moreno.classificacao === 'Cidade de 15 Minutos') {
+        classeCor = 'excelente';
+      } else if (moreno.classificacao === 'Muito proxima do conceito') {
+        classeCor = 'amarelo';
+      } else if (moreno.classificacao === 'Parcialmente aderente') {
+        classeCor = 'laranja';
+      }
+
+      const minutosText = moreno.minutos_cidade !== null ? `${moreno.minutos_cidade} minutos` : 'sem cobertura plena';
+      
+      let html = `
+        <div class="moreno-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div class="moreno-card-header" style="margin:0;">Diagnóstico de Moreno</div>
+            <button id="btn-como-calculamos" class="btn-secundario" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; display:flex; align-items:center; gap:4px;">
+              <span>?</span> Como calculamos?
+            </button>
+          </div>
+      `;
+
+      if (isPersonalizado) {
+        html += `
+          <div style="display:flex; align-items:center; justify-content:space-between; background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:4px; padding:4px 8px; margin-bottom:10px;">
+            <span style="font-size:0.75rem; color:#1d4ed8; font-weight:700;">ANÁLISE PERSONALIZADA</span>
+            <button id="btn-restaurar-padrao" class="btn-secundario" style="font-size:0.7rem; padding:1px 6px; background-color:#ffffff;">Restaurar padrao</button>
+          </div>
+        `;
+      }
+
+      html += `
+          <div class="moreno-highlight">
+            ${cidadeAtualDetalhada.nome} é uma <br><strong>cidade de ${minutosText}</strong>
+          </div>
+          <span class="moreno-badge ${classeCor}">${moreno.classificacao}</span>
+          
+          <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+          
+          <div class="moreno-metric-line">
+            <strong>Cobertura plena:</strong> ${moreno.pct_cobertura_plena}% do território alcança todos os serviços em 15 min.
+          </div>
+      `;
+
+      if (moreno.categoria_gargalo) {
+        html += `
+          <div class="moreno-metric-line">
+            <strong>Gargalo:</strong> 
+            <span class="color-dot" style="background-color: ${moreno.categoria_gargalo.cor_hex}; display:inline-block; margin:0 4px;"></span>
+            ${moreno.categoria_gargalo.rotulo} (${moreno.pct_gargalo}% alcançam em 15 min)
+          </div>
+        `;
+      }
+
+      // Seção de Personalizar Análise (Fase 10)
+      html += `
+        <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+        <span style="font-size:0.8rem; font-weight:700; color:#64748b; display:block; margin-bottom:8px;">PERSONALIZAR ANÁLISE</span>
+        
+        <div class="custom-panel-row" style="margin-bottom:12px;">
+          <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Velocidade de caminhada</label>
+          <select id="moreno-velocidade-select" style="width:100%; padding:6px; font-size:0.8rem; border-radius:4px; border:1px solid var(--border-color);">
+            <option value="2.5" ${velocidadeAtual === 2.5 ? 'selected' : ''}>2.5 km/h (idosos/mobilidade reduzida)</option>
+            <option value="3.0" ${velocidadeAtual === 3.0 ? 'selected' : ''}>3.0 km/h (conservadora - padrao)</option>
+            <option value="4.0" ${velocidadeAtual === 4.0 ? 'selected' : ''}>4.0 km/h (ritmo medio)</option>
+            <option value="5.0" ${velocidadeAtual === 5.0 ? 'selected' : ''}>5.0 km/h (caminhada rapida)</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:0.75rem; font-weight:600; color:#475569; display:block; margin-bottom:6px;">Servicos incluidos</label>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; max-height: 120px; overflow-y: auto; padding: 4px; border: 1px solid var(--border-color); border-radius:4px;">
+      `;
+
+      cidadeAtualDetalhada.indices.forEach(idx => {
+        if (idx.chave === 'geral') return;
+        const isChecked = categoriasAtivas.has(idx.chave);
+        html += `
+          <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; cursor:pointer;">
+            <input type="checkbox" class="moreno-cat-chk" value="${idx.chave}" ${isChecked ? 'checked' : ''}>
+            <span class="color-dot" style="background-color: ${idx.cor_hex}; width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${idx.rotulo.split(' ')[0]}</span>
+          </label>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+
+      // Histograma
+      html += `
+        <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+        <span style="font-size:0.8rem; font-weight:700; color:#64748b;">DISTRIBUIÇÃO DA COBERTURA PLENA</span>
+        <div class="histogram-container">
+      `;
+
+      const maxQtd = Math.max(...moreno.distribuicao.map(d => d.qtd), 1);
+      moreno.distribuicao.forEach(d => {
+        const label = d.faixa === 'sem_cobertura' ? 'Sem cobertura' : `${d.faixa.replace('_', ' a ')} min`;
+        const pctBar = (d.qtd / maxQtd) * 100;
+        html += `
+          <div class="histogram-row">
+            <span class="histogram-label">${label}</span>
+            <div class="histogram-bar-outer">
+              <div class="histogram-bar-inner" style="width: ${pctBar}%;"></div>
+            </div>
+            <span class="histogram-value">${d.qtd}</span>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+
+      // Cobertura por serviço (Fase 10.4.2)
+      html += `
+        <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+        <span style="font-size:0.8rem; font-weight:700; color:#64748b; display:block; margin-bottom:8px;">COBERTURA POR SERVIÇO</span>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+      `;
+
+      moreno.categorias_resultado.forEach(cRes => {
+        const isHeatmapAtivo = categoriaHeatmapAtiva === cRes.chave;
+        const btnClass = isHeatmapAtivo ? 'active-service-row' : '';
+        html += `
+          <div class="service-coverage-row ${btnClass}" data-chave="${cRes.chave}">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="color-dot" style="background-color: ${cRes.cor_hex};"></span>
+              <span class="service-label">${cRes.rotulo}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:0.8rem; font-weight:600;">${cRes.pct_dentro}%</span>
+              <span class="map-icon" style="cursor:pointer; opacity: ${isHeatmapAtivo ? 1 : 0.4};">🗺️</span>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+
+      if (moreno.categorias_ausentes && moreno.categorias_ausentes.length > 0) {
+        const rotulosAusentes = moreno.categorias_ausentes.map(c => c.rotulo).join(', ');
+        html += `
+          <p style="font-size:0.7rem; color:#64748b; margin-top:8px; font-style:italic;">
+            * Sem dados no OSM: ${rotulosAusentes} (desconsideradas no cálculo).
+          </p>
+        `;
+      }
+
+      html += `
+        <button id="moreno-btn-plena" class="btn-primario moreno-btn-plena" style="margin-top:10px;">Ver cobertura plena no mapa</button>
+        </div>
+      `;
+
+      panel.innerHTML = html;
+
+      // Habilita/Desabilita as isócronas no menu lateral esquerdo
+      const isocronaChecks = document.querySelectorAll('.isocrona-checkbox');
+      const isocronaSelect = document.getElementById('isocrona-minutos-select');
+      const isocronasWarning = document.getElementById('isocronas-warning-msg');
+
+      if (velocidadeAtual !== 3.0) {
+        isocronaChecks.forEach(c => {
+          c.disabled = true;
+          if (c.checked) {
+            c.checked = false;
+            c.dispatchEvent(new Event('change'));
+          }
+        });
+        if (isocronaSelect) isocronaSelect.disabled = true;
+        if (isocronasWarning) isocronasWarning.style.display = 'block';
+      } else {
+        isocronaChecks.forEach(c => c.disabled = false);
+        if (isocronaSelect) isocronaSelect.disabled = false;
+        if (isocronasWarning) isocronasWarning.style.display = 'none';
+      }
+
+      // Registra listeners
+      document.getElementById('moreno-btn-plena').addEventListener('click', () => {
+        const toggle = document.getElementById('heatmap-toggle');
+        const select = document.getElementById('heatmap-categoria-select');
+        
+        toggle.checked = true;
+        select.value = 'plena';
+        
+        updateHeatmap();
+      });
+
+      // Listener velocidade
+      document.getElementById('moreno-velocidade-select').addEventListener('change', (e) => {
+        velocidadeAtual = parseFloat(e.target.value);
+        exibirDiagnosticoMoreno();
+      });
+
+      // Listeners checkboxes de categorias
+      document.querySelectorAll('.moreno-cat-chk').forEach(chk => {
+        chk.addEventListener('change', () => {
+          if (chk.checked) {
+            categoriasAtivas.add(chk.value);
+          } else {
+            if (categoriasAtivas.size <= 1) {
+              chk.checked = true;
+              mostrarToast("Pelo menos uma categoria deve estar ativa!");
+              return;
+            }
+            categoriasAtivas.delete(chk.value);
+          }
+          exibirDiagnosticoMoreno();
+        });
+      });
+
+      // Restaurar padrão
+      const btnRestaurar = document.getElementById('btn-restaurar-padrao');
+      if (btnRestaurar) {
+        btnRestaurar.addEventListener('click', () => {
+          velocidadeAtual = parseFloat(cidadeAtualDetalhada.velocidade_kmh);
+          categoriasAtivas = new Set(cidadeAtualDetalhada.indices.map(i => i.chave).filter(k => k !== 'geral'));
+          exibirDiagnosticoMoreno();
+        });
+      }
+
+      // Como Calculamos modal
+      document.getElementById('btn-como-calculamos').addEventListener('click', () => {
+        document.getElementById('modal-explicativo-moreno').style.display = 'flex';
+      });
+
+      document.getElementById('modal-explicativo-close-x').addEventListener('click', () => {
+        document.getElementById('modal-explicativo-moreno').style.display = 'none';
+      });
+      document.getElementById('modal-explicativo-close-btn').addEventListener('click', () => {
+        document.getElementById('modal-explicativo-moreno').style.display = 'none';
+      });
+
+      // Cobertura por serviço (clique para heatmap)
+      document.querySelectorAll('.service-coverage-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const chave = row.getAttribute('data-chave');
+          
+          if (categoriaHeatmapAtiva === chave) {
+            // Desativa heatmap
+            categoriaHeatmapAtiva = null;
+            document.getElementById('heatmap-toggle').checked = false;
+            document.getElementById('heatmap-categoria-select').value = '';
+            updateHeatmap();
+            exibirDiagnosticoMoreno(); // Atualiza UI da linha selecionada
+          } else {
+            // Ativa heatmap da categoria clicada
+            categoriaHeatmapAtiva = chave;
+            document.getElementById('heatmap-toggle').checked = true;
+            document.getElementById('heatmap-categoria-select').value = chave;
+            updateHeatmap();
+            exibirDiagnosticoMoreno();
+          }
+        });
+      });
+
+    } catch (e) {
+      console.error(e);
+      panel.innerHTML = `<p style="color:#ef4444; padding:20px;">Erro ao carregar diagnostico dinamico.</p>`;
+    }
+  }
+
+  // --- Funções do Modal e Processamento (Fase 08) ---
+  
+  function abrirModalNovaCidade() {
+    document.getElementById('modal-processamento').style.display = 'flex';
+    document.getElementById('modal-form-section').style.display = 'block';
+    document.getElementById('modal-progress-section').style.display = 'none';
+    document.getElementById('modal-result-section').style.display = 'none';
+    document.getElementById('input-consulta-osm').value = '';
+  }
+
+  function fecharModal() {
+    document.getElementById('modal-processamento').style.display = 'none';
+    if (!pollingIntervalId && document.getElementById('badge-processamento-bg').style.display !== 'none') {
+      document.getElementById('badge-processamento-bg').style.display = 'none';
+    }
+  }
+
+  function minimizarModal() {
+    document.getElementById('modal-processamento').style.display = 'none';
+    document.getElementById('badge-processamento-bg').style.display = 'flex';
+  }
+
+  function reabrirModalBackground() {
+    document.getElementById('modal-processamento').style.display = 'flex';
+    document.getElementById('modal-form-section').style.display = 'none';
+    document.getElementById('modal-progress-section').style.display = 'block';
+    document.getElementById('modal-result-section').style.display = 'none';
+  }
+
+  async function submeterNovaCidade() {
+    const consulta = document.getElementById('input-consulta-osm').value.trim();
+    if (!consulta) {
+      mostrarToast("Digite o nome da cidade no formato correto.");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/v1/processamentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consulta_osm: consulta })
+      });
+      
+      const data = await res.json();
+      
+      if (res.status === 200 && data.ja_processada) {
+        mostrarToast("Cidade ja processada! Carregando...");
+        fecharModal();
+        await carregarCidades();
+        selectCidade.value = data.cidade_id.toString();
+        selectCidade.dispatchEvent(new Event('change'));
+        return;
+      }
+      
+      if (res.status === 202) {
+        iniciarAcompanhamentoJob(data.id, consulta);
+        return;
+      }
+      
+      if (res.status === 409) {
+        mostrarToast("Processamento concorrente detectado!");
+        iniciarAcompanhamentoJob(data.job.id, data.job.consulta_osm);
+        return;
+      }
+
+      // Erros 400
+      mostrarToast(data.erro || "Falha ao iniciar processamento.");
+
+    } catch (err) {
+      mostrarToast("Nao foi possivel conectar ao servidor.");
+    }
+  }
+
+  function iniciarAcompanhamentoJob(jobId, consulta) {
+    activeJobId = jobId;
+    
+    // Altera o modal para modo progresso
+    document.getElementById('modal-form-section').style.display = 'none';
+    document.getElementById('modal-progress-section').style.display = 'block';
+    document.getElementById('modal-result-section').style.display = 'none';
+    
+    document.getElementById('progress-step-msg').innerText = "Iniciando download...";
+    document.getElementById('modal-progress-bar').style.width = "5%";
+    document.getElementById('progress-pct-text').innerText = "5%";
+    
+    // Garante que o badge esteja oculto ou ativo conforme minimização
+    document.getElementById('badge-text-msg').innerText = `Processando: ${consulta.split(',')[0]} (5%)`;
+
+    if (pollingIntervalId) clearInterval(pollingIntervalId);
+
+    pollingIntervalId = setInterval(() => pollJobStatus(jobId, consulta), 2000);
+  }
+
+  async function pollJobStatus(jobId, consulta) {
+    try {
+      const res = await fetch('/api/v1/processamentos/atual');
+      const data = await res.json();
+      const job = data.job;
+
+      // Se não há job ativo ou o ID mudou
+      if (!job || job.id !== jobId) {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+        fecharModal();
+        return;
+      }
+
+      // Atualiza progresso na interface
+      const pct = job.pct;
+      document.getElementById('modal-progress-bar').style.width = `${pct}%`;
+      document.getElementById('modal-progress-bar').setAttribute('aria-valuenow', pct);
+      document.getElementById('progress-pct-text').innerText = `${pct}%`;
+      document.getElementById('progress-step-msg').innerText = job.msg;
+      
+      const nomeCurto = consulta.split(',')[0];
+      document.getElementById('badge-text-msg').innerText = `Processando: ${nomeCurto} (${pct}%)`;
+
+      if (job.status === 'concluido') {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+        
+        // Sucesso
+        document.getElementById('modal-progress-section').style.display = 'none';
+        document.getElementById('modal-result-section').style.display = 'block';
+        
+        const resMsg = document.getElementById('modal-result-message');
+        resMsg.className = "result-msg sucesso";
+        resMsg.innerText = "Cidade processada e gravada com sucesso!";
+        
+        // Recarrega seletor e escolhe a cidade
+        await carregarCidades();
+        selectCidade.value = job.cidadeId.toString();
+        
+        setTimeout(() => {
+          fecharModal();
+          selectCidade.dispatchEvent(new Event('change'));
+        }, 1500);
+      } else if (job.status === 'erro') {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+        
+        // Erro
+        document.getElementById('modal-progress-section').style.display = 'none';
+        document.getElementById('modal-result-section').style.display = 'block';
+        
+        const resMsg = document.getElementById('modal-result-message');
+        resMsg.className = "result-msg erro";
+        resMsg.innerText = job.msg || "Ocorreu um erro ao processar a cidade.";
+        
+        // Esconde o badge flutuante
+        document.getElementById('badge-processamento-bg').style.display = 'none';
+      }
+
+    } catch (err) {
+      console.warn("Erro no polling de progresso:", err);
+    }
+  }
+
+  async function verificarJobAtivoAoCarregar() {
+    try {
+      const res = await fetch('/api/v1/processamentos/atual');
+      const data = await res.json();
+      const job = data.job;
+
+      if (job && job.status === 'rodando') {
+        iniciarAcompanhamentoJob(job.id, job.consulta_osm);
+        reabrirModalBackground();
+      }
+    } catch (e) {
+      // Ignora erro de rede no boot
+    }
+  }
+
 });
 
-// Adiciona a legenda de cores do heatmap
+// Legenda do Heatmap
 function adicionarLegendaHeatmap(map) {
   if (legendaHeatmap) return;
   

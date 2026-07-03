@@ -176,6 +176,32 @@ def gravar_cidade(conn, cfg, G, resultados):
                     isocrona_records
                 )
                 
+            # 6.5 Inserção do índice de Moreno (Fase 09)
+            if 'moreno' in resultados and resultados['moreno'] is not None:
+                m = resultados['moreno']
+                cur.execute("""
+                    INSERT INTO indice_moreno (
+                        cidade_id, limiar_minutos, pct_cobertura_plena, minutos_cidade,
+                        tempo_pior_medio, tempo_pior_mediana, pct_nos_sem_cobertura,
+                        atende_conceito, classificacao, categoria_gargalo_id, pct_gargalo,
+                        categorias_ausentes, distribuicao
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    cidade_id,
+                    m["limiar_minutos"],
+                    m["pct_cobertura_plena"],
+                    m["minutos_cidade"],
+                    m["tempo_pior_medio"],
+                    m["tempo_pior_mediana"],
+                    m["pct_nos_sem_cobertura"],
+                    m["atende_conceito"],
+                    m["classificacao"],
+                    m["categoria_gargalo_id"],
+                    m["pct_gargalo"],
+                    json.dumps(m.get("categorias_ausentes", [])),
+                    json.dumps(m["distribuicao"])
+                ))
+                
             # 7. Atualização final das estatísticas na cidade
             cur.execute("""
                 UPDATE cidade 

@@ -3,7 +3,7 @@ import networkx as nx
 import osmnx as ox
 from algorithm.graph import slug, baixar_ou_carregar_grafo
 from algorithm.config import Configuracao
-from algorithm.metrics import indice_no, agregados_cidade
+from algorithm.metrics import indice_no, agregados_cidade, diagnostico_moreno
 from algorithm.services import localizar_servicos
 from algorithm.reachability import calcular_categoria
 from algorithm.isochrones import gerar_isocronas
@@ -29,6 +29,30 @@ def test_indice_no():
     
     # Caso 4: Se não houver tempos, retorna 0
     assert indice_no({}, 15) == 0.0
+
+def test_diagnostico_moreno_unitario():
+    alcancabilidade = {
+        101: {1: (10.0, 1), 2: (5.0, 2)},
+        102: {1: (8.0, 1), 2: (12.0, 2)},
+        103: {1: (22.0, 1), 2: (18.0, 2)},
+        104: {1: (14.0, 1), 2: (None, None)}
+    }
+    categorias_presentes = [1, 2]
+    limiar = 15.0
+    agregados = [
+        {"categoria_id": 1, "pct_dentro_limiar": 75.0},
+        {"categoria_id": 2, "pct_dentro_limiar": 50.0}
+    ]
+    res = diagnostico_moreno(alcancabilidade, categorias_presentes, limiar, agregados)
+    assert res["pct_cobertura_plena"] == 50.0
+    assert res["minutos_cidade"] == 12
+    assert res["tempo_pior_mediana"] == 12.0
+    assert res["tempo_pior_medio"] == 14.67
+    assert res["pct_nos_sem_cobertura"] == 25.0
+    assert res["categoria_gargalo_id"] == 2
+    assert res["pct_gargalo"] == 50.0
+    assert res["atende_conceito"] is True
+    assert res["classificacao"] == "Cidade de 15 Minutos"
 
 def test_grafo_e_pesos():
     cfg = Configuracao(consulta_osm="Águas de São Pedro, São Paulo, Brazil", usar_cache_grafo=True)
@@ -79,13 +103,20 @@ def test_pipeline_completo():
         # 5. Agregados
         agregados = agregados_cidade(None, list(G.nodes), alc_simples, cfg.limiar_minutos)
         
+        # 5.5 Diagnóstico Moreno
+        categorias_presentes = [cat['id'] for cat in categorias if len(servicos_por_categoria.get(cat['id'], [])) > 0]
+        categorias_ausentes = [cat['id'] for cat in categorias if len(servicos_por_categoria.get(cat['id'], [])) == 0]
+        moreno_res = diagnostico_moreno(alcancabilidade_por_no, categorias_presentes, cfg.limiar_minutos, agregados)
+        moreno_res['categorias_ausentes'] = categorias_ausentes
+        
         # 6. Grava no banco
         resultados = {
             'tempo_execucao_s': 1.5,
             'servicos_por_categoria': servicos_por_categoria,
             'alcancabilidade_por_no': alcancabilidade_por_no,
             'isocronas': isocronas,
-            'agregados': agregados
+            'agregados': agregados,
+            'moreno': moreno_res
         }
         
         cidade_id = gravar_cidade(conn, cfg, G, resultados)
@@ -108,6 +139,12 @@ def test_pipeline_completo():
                     
             # indice_cidade tem linha da categoria 0 com indice entre 0 e 100
             cur.execute("SELECT indice FROM indice_cidade WHERE cidade_id = %s AND categoria_id = 0", (cidade_id,))
+            row = cur.fetchone()
+            assert row is not None
+            assert 0 <= float(row[0]) <= 100
+            
+            # indice_moreno tem 1 linha e pct_cobertura_plena está entre 0 e 100
+            cur.execute("SELECT pct_cobertura_plena FROM indice_moreno WHERE cidade_id = %s", (cidade_id,))
             row = cur.fetchone()
             assert row is not None
             assert 0 <= float(row[0]) <= 100
