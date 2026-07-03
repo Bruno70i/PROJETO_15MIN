@@ -1,0 +1,30 @@
+services:
+  banco:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: alcancabilidade
+    volumes:
+      - dados_pg:/var/lib/postgresql/data
+      - ../db:/docker-entrypoint-initdb.d:ro   # schema+seed na 1ª subida
+    ports: ["5432:5432"]
+
+  api:
+    build: 
+      context: ..
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: banco
+      PGPORT: 5432
+      PGDATABASE: alcancabilidade
+      PGUSER: postgres
+      PGPASSWORD: ${PGPASSWORD}
+      API_PORT: 3000
+      WEB_DIR: /app/web
+    depends_on: [banco]
+    ports: ["3000:3000"]
+
+volumes:
+  dados_pg:

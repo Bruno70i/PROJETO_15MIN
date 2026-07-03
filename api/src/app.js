@@ -23,6 +23,7 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('tiny'));
 app.use(express.json());
+app.use(express.static(process.env.WEB_DIR || path.resolve(__dirname, '../../web')));
 
 // Rate Limiter
 const limiter = rateLimit({
