@@ -43,6 +43,10 @@ export async function getAlcancabilidade(cidadeId, lat, lon) {
   return request(`${API_BASE}/alcancabilidade?cidade_id=${cidadeId}&lat=${lat}&lon=${lon}`);
 }
 
+export async function getRota(cidadeId, deOsmId, paraOsmId) {
+  return request(`${API_BASE}/rota?cidade_id=${cidadeId}&de=${deOsmId}&para=${paraOsmId}`);
+}
+
 export async function getComparar(cidadesIds) {
   return request(`${API_BASE}/comparar?cidades=${encodeURIComponent(cidadesIds.join(','))}`);
 }

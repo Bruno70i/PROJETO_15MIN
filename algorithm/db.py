@@ -84,6 +84,37 @@ def gravar_cidade(conn, cfg, G, resultados):
                 if chave not in mapa_servicos:
                     mapa_servicos[chave] = s_id
                     
+            # 3.5 Inserção de arestas (traçado real das vias, usado pela API de rotas)
+            # O grafo é um MultiDiGraph: entre duas interseções pode haver mais de
+            # uma via paralela — mantém-se apenas a mais rápida por par (u, v).
+            aresta_melhor = {}
+            for u, v, data in G.edges(data=True):
+                tempo_s = float(data.get("travel_time", 0.0))
+                chave = (u, v)
+                if chave in aresta_melhor and tempo_s >= aresta_melhor[chave][0]:
+                    continue
+                geom = data.get("geometry")
+                if geom is not None:
+                    coords = [[float(x), float(y)] for x, y in geom.coords]
+                else:
+                    coords = [
+                        [float(G.nodes[u]["x"]), float(G.nodes[u]["y"])],
+                        [float(G.nodes[v]["x"]), float(G.nodes[v]["y"])],
+                    ]
+                aresta_melhor[chave] = (tempo_s, coords)
+
+            aresta_records = [
+                (cidade_id, u, v, tempo_s, json.dumps(coords))
+                for (u, v), (tempo_s, coords) in aresta_melhor.items()
+            ]
+            if aresta_records:
+                psycopg2.extras.execute_values(
+                    cur,
+                    "INSERT INTO aresta (cidade_id, no_origem, no_destino, tempo_s, geom) VALUES %s",
+                    aresta_records,
+                    page_size=10000
+                )
+
             # 4. Inserção de alcançabilidade dos nós
             alc_records = []
             for no_id, cat_tempos in resultados['alcancabilidade_por_no'].items():

@@ -88,4 +88,30 @@ describe('API Integration Tests', () => {
     expect(res.body).toHaveProperty('erro');
     expect(res.body.erro).toContain('Categoria invalida');
   });
+
+  it('GET /api/v1/rota -> 200 com LineString entre no e servico mais proximo', async () => {
+    // Usa o proprio /alcancabilidade para obter um par (no, servico) valido
+    const alc = await request(app)
+      .get(`/api/v1/alcancabilidade?cidade_id=${cidadeTestId}&lat=${latCentro}&lon=${lonCentro}`);
+    expect(alc.status).toBe(200);
+
+    const catComServico = alc.body.categorias.find(
+      c => c.servico_mais_proximo && c.tempo_min !== null
+    );
+    expect(catComServico).toBeDefined();
+
+    const res = await request(app)
+      .get(`/api/v1/rota?cidade_id=${cidadeTestId}&de=${alc.body.no.osm_id}&para=${catComServico.servico_mais_proximo.osm_no_id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.geojson.type).toBe('LineString');
+    expect(res.body.geojson.coordinates.length).toBeGreaterThanOrEqual(2);
+    expect(res.body.tempo_min).toBeGreaterThanOrEqual(0);
+  });
+
+  it('GET /api/v1/rota com parametros invalidos -> 400', async () => {
+    const res = await request(app)
+      .get(`/api/v1/rota?cidade_id=${cidadeTestId}&de=abc&para=xyz`);
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('erro');
+  });
 });

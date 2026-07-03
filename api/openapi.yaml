@@ -267,6 +267,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
+  /rota:
+    get:
+      summary: Rota a pé pela malha viária entre dois nós do grafo
+      description: >-
+        Calcula, via Dijkstra sobre as arestas reais do OpenStreetMap, o
+        caminho a pé entre dois nós da cidade e retorna o traçado como
+        GeoJSON LineString. Os identificadores 'de' e 'para' são osm_id de
+        nós — obtidos, por exemplo, em /alcancabilidade (campos no.osm_id e
+        categorias[].servico_mais_proximo.osm_no_id).
+      parameters:
+        - name: cidade_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          example: 10
+        - name: de
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "2062713466"
+        - name: para
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "633283351"
+      responses:
+        '200':
+          description: Rota encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tempo_min:
+                    type: number
+                    example: 7.32
+                  qtd_nos_caminho:
+                    type: integer
+                    example: 25
+                  geojson:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        example: LineString
+                      coordinates:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                        example: [[-46.4028, -24.0058], [-46.4031, -24.0052]]
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Cidade sem malha gravada ou caminho inexistente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
 components:
   schemas:
     CidadeResumida:

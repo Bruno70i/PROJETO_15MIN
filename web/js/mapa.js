@@ -1,4 +1,4 @@
-import { getAlcancabilidade, getIsocronas, getMapa } from './api.js';
+import { getAlcancabilidade, getIsocronas, getMapa, getRota } from './api.js';
 import { exibirResultadosPonto, limparPainelLateral, mostrarCarregando, mostrarToast } from './painel.js';
 
 let mapa;
@@ -51,6 +51,7 @@ async function onMapaClick(e) {
     
   try {
     const dados = await getAlcancabilidade(cidadeId, lat, lng);
+    dados.cidade_id = cidadeId; // usado depois para tracar a rota real
     exibirResultadosPonto(dados);
   } catch (error) {
     if (marcadorClique) {
@@ -84,38 +85,59 @@ function limparCaminho() {
   }
 }
 
-// Traça uma linha tracejada entre o clique e o serviço mais próximo
-export function mostrarCaminhoServico(latClique, lonClique, servico) {
+// Traça a rota REAL pela malha viária entre o nó do clique e o serviço mais
+// próximo, usando o endpoint /rota (Dijkstra sobre as arestas do OSM).
+// corHex = cor da categoria, para a linha ficar legível e coerente com o painel.
+// origem = dados.no do /alcancabilidade: { osm_id, lat, lon }
+export async function mostrarCaminhoServico(cidadeId, origem, servico, corHex) {
   limparServicosMapa();
   limparCaminho();
-  
+
   const latDest = servico.lat;
   const lonDest = servico.lon;
-  
-  // Cria marcador do serviço com a cor correspondente
+  const cor = corHex || '#e11d48';
+
+  // Marcador do serviço com a cor da categoria
   const marcadorServico = L.circleMarker([latDest, lonDest], {
-    radius: 8,
-    fillColor: '#2c3e50',
+    radius: 9,
+    fillColor: cor,
     color: '#ffffff',
     weight: 2,
     opacity: 1,
-    fillOpacity: 0.8
+    fillOpacity: 0.95
   }).addTo(mapa)
     .bindPopup(`<b>Servico Mais Proximo</b><br>${servico.nome || 'Sem nome'}`)
     .openPopup();
-    
+
   marcadoresServicos.push(marcadorServico);
-  
-  // Cria linha tracejada
-  linhaCaminho = L.polyline([[latClique, lonClique], [latDest, lonDest]], {
-    color: '#34495e',
-    weight: 3,
-    dashArray: '5, 10',
-    opacity: 0.8
-  }).addTo(mapa);
-  
-  // Ajusta o mapa para conter a linha
-  mapa.fitBounds(linhaCaminho.getBounds(), { padding: [50, 50] });
+
+  try {
+    const rota = await getRota(cidadeId, origem.osm_id, servico.osm_no_id);
+
+    // Duas polylines sobrepostas: contorno branco embaixo (casing) e a cor
+    // da categoria por cima — legível sobre qualquer fundo do mapa.
+    const casing = L.geoJSON(rota.geojson, {
+      style: { color: '#ffffff', weight: 9, opacity: 0.9 }
+    });
+    const linha = L.geoJSON(rota.geojson, {
+      style: { color: cor, weight: 5, opacity: 1 }
+    });
+    linha.bindPopup(`Caminho a pe pela malha viaria: <b>${rota.tempo_min.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} min</b>`);
+
+    linhaCaminho = L.featureGroup([casing, linha]).addTo(mapa);
+    mapa.fitBounds(linhaCaminho.getBounds(), { padding: [50, 50] });
+  } catch (error) {
+    // Fallback: sem rota disponivel (cidade antiga sem arestas ou nos
+    // desconexos) — linha reta tracejada, sinalizando que e aproximacao.
+    mostrarToast('Rota pela malha viaria indisponivel; exibindo linha reta aproximada.');
+    linhaCaminho = L.polyline([[origem.lat, origem.lon], [latDest, lonDest]], {
+      color: cor,
+      weight: 4,
+      dashArray: '6, 10',
+      opacity: 0.9
+    }).addTo(mapa);
+    mapa.fitBounds(linhaCaminho.getBounds(), { padding: [50, 50] });
+  }
 }
 
 // Adiciona ou remove isócrona no mapa

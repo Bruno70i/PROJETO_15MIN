@@ -13,13 +13,14 @@ import pool from './db.js';
 import cidadesRouter from './routes/cidades.js';
 import isocronasRouter from './routes/isocronas.js';
 import alcancabilidadeRouter from './routes/alcancabilidade.js';
+import rotaRouter from './routes/rota.js';
 
 const app = express();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configurações Globais
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(morgan('tiny'));
 app.use(express.json());
@@ -127,6 +128,7 @@ app.get('/api/v1/comparar', async (req, res, next) => {
 app.use('/api/v1/cidades', cidadesRouter);
 app.use('/api/v1/cidades', isocronasRouter); // Rota /cidades/:id/isocronas está neste router
 app.use('/api/v1/alcancabilidade', alcancabilidadeRouter);
+app.use('/api/v1/rota', rotaRouter);
 
 // Handler 404
 app.use((req, res, next) => {

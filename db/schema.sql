@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS indice_cidade (
     PRIMARY KEY (cidade_id, categoria_id)
 );
 
+CREATE TABLE IF NOT EXISTS aresta (
+    id           BIGSERIAL PRIMARY KEY,
+    cidade_id    INTEGER NOT NULL REFERENCES cidade(id) ON DELETE CASCADE,
+    no_origem    BIGINT NOT NULL,           -- osm_id do nó de origem
+    no_destino   BIGINT NOT NULL,           -- osm_id do nó de destino
+    tempo_s      NUMERIC(10,2) NOT NULL,    -- tempo de travessia a pé (s)
+    geom         JSONB NOT NULL             -- [[lon,lat], ...] traçado real da via
+);
+CREATE INDEX IF NOT EXISTS idx_aresta_cidade ON aresta (cidade_id);
+
 CREATE TABLE IF NOT EXISTS isocrona (
     id           BIGSERIAL PRIMARY KEY,
     cidade_id    INTEGER NOT NULL REFERENCES cidade(id) ON DELETE CASCADE,

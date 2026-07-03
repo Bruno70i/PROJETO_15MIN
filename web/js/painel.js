@@ -107,7 +107,7 @@ export function exibirResultadosPonto(dados) {
       const idxCat = parseInt(el.getAttribute('data-index'), 10);
       const cat = dados.categorias[idxCat];
       if (cat && cat.servico_mais_proximo) {
-        mostrarCaminhoServico(dados.no.lat, dados.no.lon, cat.servico_mais_proximo);
+        mostrarCaminhoServico(dados.cidade_id, dados.no, cat.servico_mais_proximo, cat.cor_hex);
       } else {
         mostrarToast("Nao ha servicos dessa categoria proximos o suficiente.");
       }

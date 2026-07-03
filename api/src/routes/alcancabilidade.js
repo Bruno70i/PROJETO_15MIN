@@ -68,7 +68,8 @@ router.get('/', async (req, res, next) => {
     // 3. Busca alcançabilidade de todas as categorias para este nó
     const queryAlcancabilidade = `
       SELECT cat.chave, cat.rotulo, cat.cor_hex, a.tempo_min, a.dentro_limiar,
-             s.id AS servico_id, s.nome AS servico_nome, s.lat AS servico_lat, s.lon AS servico_lon
+             s.id AS servico_id, s.nome AS servico_nome, s.lat AS servico_lat, s.lon AS servico_lon,
+             s.osm_no_id AS servico_osm_no_id
       FROM alcancabilidade_no a
       JOIN categoria_servico cat ON cat.id = a.categoria_id
       LEFT JOIN servico s ON s.id = a.servico_id
@@ -84,7 +85,8 @@ router.get('/', async (req, res, next) => {
           id: parseInt(r.servico_id, 10),
           nome: r.servico_nome,
           lat: parseFloat(r.servico_lat),
-          lon: parseFloat(r.servico_lon)
+          lon: parseFloat(r.servico_lon),
+          osm_no_id: String(r.servico_osm_no_id)
         };
       }
       return {
