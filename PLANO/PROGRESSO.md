@@ -12,6 +12,8 @@
 | 05 Frontend | ✅ concluída | 2026-07-03 | Frontend com Leaflet totalmente integrado à API. |
 | 06 Integração | ✅ concluída | 2026-07-03 | Integração final E2E e testes de integridade ok. |
 | 07 Deploy (opcional) | ⬜ pendente | | |
+| 08 Cidades sob demanda | ⬜ pendente | | processar qualquer cidade pela interface, com progresso |
+| 09 Índice Moreno | ⬜ pendente | | métrica da cidade inteira ("cidade de N minutos") |
 
 Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (explicar)
 
