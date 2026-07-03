@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plataforma de Alcançabilidade Urbana — Cidade de 15 Minutos</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- Estilos customizados -->
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header class="header-bar">
+    <div class="brand">
+      <h1>Cidade de 15 Minutos</h1>
+    </div>
+    
+    <div class="controls">
+      <label for="cidade-select" style="font-size: 0.9rem; font-weight: 600; color: #64748b;">Cidade:</label>
+      <select id="cidade-select" aria-label="Seletor de Cidade">
+        <option value="0">Carregando cidades...</option>
+      </select>
+      
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="index.html" class="active">Mapa</a>
+        <a href="comparar.html">Comparar</a>
+        <a href="sobre.html">Sobre</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="main-container">
+    <!-- Mapa OSM / Leaflet -->
+    <div id="map" role="application" aria-label="Mapa interativo do OpenStreetMap"></div>
+    
+    <!-- Painel Lateral -->
+    <aside class="side-panel" aria-label="Resultados de alcançabilidade">
+      <div class="panel-header">
+        <h2>Analise de Alcançabilidade</h2>
+        <button id="toggle-panel-btn" style="background:none; border:none; color:var(--primary-color); font-weight:600; cursor:pointer;" aria-label="Fechar painel">Ocultar</button>
+      </div>
+      
+      <!-- Controles de Camadas dentro do Painel -->
+      <div style="padding: 10px 20px 0 20px;">
+        <div class="layer-controls">
+          <div class="layer-control-title">Filtros & Camadas</div>
+          
+          <!-- Seletor de Minutos Isócronas -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:0.8rem; font-weight:600;">Tempo de Isocrona:</span>
+            <select id="isocrona-minutos-select" style="padding:2px 6px; font-size:0.8rem; border-radius:4px; border:1px solid var(--border-color);">
+              <option value="5">5 min</option>
+              <option value="10">10 min</option>
+              <option value="15" selected>15 min</option>
+            </select>
+          </div>
+          
+          <!-- Lista de Isócronas por Categoria -->
+          <div id="isocronas-check-container" style="display:flex; flex-direction:column; gap:6px;">
+            <!-- Gerado via JS -->
+          </div>
+          
+          <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+          
+          <!-- Mapa Geral de Calor (Nós) -->
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label class="layer-checkbox">
+              <input type="checkbox" id="heatmap-toggle">
+              <strong>Ver Mapa de Calor (Nós)</strong>
+            </label>
+            <select id="heatmap-categoria-select" style="padding:4px 6px; font-size:0.8rem; border-radius:4px; border:1px solid var(--border-color); width:100%;" disabled>
+              <option value="">Selecione a categoria...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Resultados do Ponto Clicado -->
+      <div class="panel-content" id="panel-results">
+        <p class="info-msg" style="text-align:center; color:#64748b; font-size:0.9rem; padding: 20px;">
+          Selecione uma cidade e clique em qualquer ponto do mapa para ver o tempo de alcancabilidade dos servicos.
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Container de Toasts para Notificações -->
+  <div class="toast-container" id="toast-container" aria-live="assertive"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Código de Controle Principal -->
+  <script type="module">
+    import { getCidades, getCidadeDetalhe, getMapa } from './js/api.js';
+    import { inicializarMapa, centralizarMapa, limparElementosMapa, toggleIsocrona, toggleHeatmap, limparIsocronas } from './js/mapa.js';
+    import { limparPainelLateral, mostrarToast } from './js/painel.js';
+
+    let cidadeAtualDetalhada = null;
+    let legendaHeatmap = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Inicializa Mapa
+      const map = inicializarMapa();
+      
+      // 2. Carrega Cidades
+      const selectCidade = document.getElementById('cidade-select');
+      try {
+        const cidades = await getCidades();
+        selectCidade.innerHTML = '';
+        
+        if (cidades.length === 0) {
+          selectCidade.innerHTML = '<option value="0">Nenhuma cidade processada</option>';
+          document.getElementById('panel-results').innerHTML = `
+            <p style="text-align:center; color:#ef4444; font-weight:600; padding:20px;">
+              Nenhuma cidade processada ainda. Rode o algoritmo (fase 03) para carregar os dados no banco.
+            </p>
+          `;
+          return;
+        }
+        
+        // Adiciona opção default
+        const optDefault = document.createElement('option');
+        optDefault.value = '0';
+        optDefault.innerText = 'Selecione uma cidade...';
+        selectCidade.appendChild(optDefault);
+        
+        cidades.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.innerText = `${c.nome} (${c.pais})`;
+          selectCidade.appendChild(opt);
+        });
+      } catch (error) {
+        selectCidade.innerHTML = '<option value="0">Erro ao carregar cidades</option>';
+        mostrarToast("Nao foi possivel conectar a API. Certifique-se de que o servidor esta rodando.");
+      }
+      
+      // 3. Evento de Seleção de Cidade
+      selectCidade.addEventListener('change', async () => {
+        const cidadeId = parseInt(selectCidade.value, 10);
+        
+        // Limpar tudo
+        limparElementosMapa();
+        limparIsocronas();
+        if (document.getElementById('heatmap-toggle')) {
+          document.getElementById('heatmap-toggle').checked = false;
+        }
+        toggleHeatmap(cidadeId, '', false);
+        limparPainelLateral();
+        removerLegendaHeatmap(map);
+        
+        if (cidadeId === 0) return;
+        
+        try {
+          cidadeAtualDetalhada = await getCidadeDetalhe(cidadeId);
+          
+          // Centraliza na cidade a partir do primeiro nó do mapa geral
+          const amostra = await getMapa(cidadeId, cidadeAtualDetalhada.indices[0].chave, 1);
+          if (amostra && amostra.length > 0) {
+            centralizarMapa(amostra[0].lat, amostra[0].lon, 13);
+          }
+          
+          // Popula lista de checkboxes de isócronas
+          const containerChecks = document.getElementById('isocronas-check-container');
+          containerChecks.innerHTML = '';
+          
+          // Popula select do heatmap
+          const selectHeatmap = document.getElementById('heatmap-categoria-select');
+          selectHeatmap.innerHTML = '<option value="">Escolha a categoria...</option>';
+          selectHeatmap.disabled = false;
+          
+          cidadeAtualDetalhada.indices.forEach(idx => {
+            if (idx.chave === 'geral') return;
+            
+            // Checkbox Isócrona
+            const label = document.createElement('label');
+            label.className = 'layer-checkbox';
+            label.style.borderLeft = `4px solid ${idx.cor_hex}`;
+            label.style.paddingLeft = '5px';
+            label.innerHTML = `
+              <input type="checkbox" class="isocrona-checkbox" data-chave="${idx.chave}" data-cor="${idx.cor_hex}">
+              Isocrona ${idx.rotulo}
+            `;
+            containerChecks.appendChild(label);
+            
+            // Opção Heatmap
+            const opt = document.createElement('option');
+            opt.value = idx.chave;
+            opt.innerText = idx.rotulo;
+            selectHeatmap.appendChild(opt);
+          });
+          
+          // Registra eventos para os checkboxes recém criados
+          document.querySelectorAll('.isocrona-checkbox').forEach(chk => {
+            chk.addEventListener('change', () => {
+              const categoria = chk.getAttribute('data-chave');
+              const cor = chk.getAttribute('data-cor');
+              const minutos = parseInt(document.getElementById('isocrona-minutos-select').value, 10);
+              toggleIsocrona(cidadeId, categoria, minutos, chk.checked, cor);
+            });
+          });
+          
+        } catch (error) {
+          mostrarToast("Erro ao carregar detalhes da cidade.");
+        }
+      });
+      
+      // 4. Seletor de Minutos das Isócronas
+      document.getElementById('isocrona-minutos-select').addEventListener('change', () => {
+        const selectCidade = document.getElementById('cidade-select');
+        const cidadeId = parseInt(selectCidade.value, 10);
+        if (cidadeId === 0) return;
+        
+        // Atualiza todas as isócronas ativas para o novo tempo
+        document.querySelectorAll('.isocrona-checkbox').forEach(chk => {
+          if (chk.checked) {
+            const categoria = chk.getAttribute('data-chave');
+            const cor = chk.getAttribute('data-cor');
+            const minutos = parseInt(document.getElementById('isocrona-minutos-select').value, 10);
+            toggleIsocrona(cidadeId, categoria, minutos, true, cor);
+          }
+        });
+      });
+      
+      // 5. Controles do Heatmap (Mapa Geral de Nós)
+      const heatmapToggle = document.getElementById('heatmap-toggle');
+      const heatmapSelect = document.getElementById('heatmap-categoria-select');
+      
+      const updateHeatmap = () => {
+        const cidadeId = parseInt(selectCidade.value, 10);
+        const cat = heatmapSelect.value;
+        const ativo = heatmapToggle.checked && cat !== '';
+        
+        toggleHeatmap(cidadeId, cat, ativo);
+        
+        if (ativo) {
+          adicionarLegendaHeatmap(map);
+        } else {
+          removerLegendaHeatmap(map);
+        }
+      };
+      
+      heatmapToggle.addEventListener('change', updateHeatmap);
+      heatmapSelect.addEventListener('change', updateHeatmap);
+      
+      // 6. Colapso do painel lateral (responsividade / interatividade)
+      const sidePanel = document.querySelector('.side-panel');
+      const togglePanelBtn = document.getElementById('toggle-panel-btn');
+      
+      togglePanelBtn.addEventListener('click', () => {
+        sidePanel.classList.toggle('collapsed');
+        if (sidePanel.classList.contains('collapsed')) {
+          togglePanelBtn.innerText = 'Exibir';
+        } else {
+          togglePanelBtn.innerText = 'Ocultar';
+        }
+      });
+    });
+
+    // Adiciona a legenda de cores do heatmap
+    function adicionarLegendaHeatmap(map) {
+      if (legendaHeatmap) return;
+      
+      legendaHeatmap = L.control({ position: 'bottomleft' });
+      
+      legendaHeatmap.onAdd = function () {
+        const div = L.DomUtil.create('div', 'info legend');
+        const grades = [0, 5, 10, 15, 25];
+        const cores = ['#1a9850', '#91cf60', '#d9ef8b', '#fee08b', '#d73027'];
+        const rotulos = ['&le; 5 min', '&le; 10 min', '&le; 15 min', '&le; 25 min', '&gt; 25 min'];
+        
+        div.innerHTML = '<strong>Tempo de Acesso</strong><br>';
+        for (let i = 0; i < grades.length; i++) {
+          div.innerHTML +=
+            `<i style="background:${cores[i]}"></i> ${rotulos[i]}<br>`;
+        }
+        div.innerHTML += `<i style="background:#999999"></i> Inalcancavel`;
+        return div;
+      };
+      
+      legendaHeatmap.addTo(map);
+    }
+
+    function removerLegendaHeatmap(map) {
+      if (legendaHeatmap) {
+        map.removeControl(legendaHeatmap);
+        legendaHeatmap = null;
+      }
+    }
+  </script>
+</body>
+</html>

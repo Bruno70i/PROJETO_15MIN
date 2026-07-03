@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparação de Cidades — Cidade de 15 Minutos</title>
+  <link rel="stylesheet" href="css/estilo.css">
+  <style>
+    .comparison-container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    
+    .title-section {
+      margin-bottom: 30px;
+    }
+    
+    .title-section h2 {
+      color: var(--primary-color);
+      margin-bottom: 10px;
+    }
+    
+    .cities-selector-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 30px;
+      padding: 15px;
+      background-color: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+    
+    .city-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    
+    .comparison-table-wrapper {
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    
+    .comparison-table th, .comparison-table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .comparison-table th {
+      background-color: #f1f5f9;
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+    
+    .comparison-table tr:hover {
+      background-color: #f8fafc;
+    }
+    
+    .comparison-table tr.highlighted-row {
+      background-color: #e2e8f0;
+      font-weight: 700;
+    }
+    
+    .comparison-table tr.highlighted-row td {
+      border-top: 2px solid var(--primary-color);
+      border-bottom: 2px solid var(--primary-color);
+    }
+    
+    /* Barras de Índice */
+    .bars-section {
+      margin-top: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .bar-outer {
+      background-color: #e2e8f0;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    .bar-inner {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s ease-in-out;
+    }
+    
+    .warning-box {
+      background-color: #fffbeb;
+      border: 1px solid #fef3c7;
+      color: #b45309;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header class="header-bar">
+    <div class="brand">
+      <h1>Cidade de 15 Minutos</h1>
+    </div>
+    
+    <div class="controls">
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="index.html">Mapa</a>
+        <a href="comparar.html" class="active">Comparar</a>
+        <a href="sobre.html">Sobre</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Container de Comparação -->
+  <main class="comparison-container">
+    <div class="title-section">
+      <h2>Comparacao de Cidades</h2>
+      <p style="color:#64748b; font-size:0.9rem;">
+        Selecione ate 5 cidades para comparar o tempo medio de acesso e a porcentagem da populacao dentro do limiar de 15 minutos de caminhada.
+      </p>
+    </div>
+    
+    <!-- Seletor de Cidades (Checkboxes) -->
+    <div class="cities-selector-group" id="cities-selector-group">
+      <p style="color:#64748b; font-size:0.9rem;">Carregando cidades...</p>
+    </div>
+    
+    <!-- Resultado da Comparação -->
+    <div id="comparison-result">
+      <div class="warning-box">
+        Selecione pelo menos duas cidades para exibir a tabela de comparacao.
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Script da Página -->
+  <script type="module" src="js/comparar.js"></script>
+</body>
+</html>

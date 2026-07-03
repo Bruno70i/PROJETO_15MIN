@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sobre o Projeto — Cidade de 15 Minutos</title>
+  <link rel="stylesheet" href="css/estilo.css">
+  <style>
+    .about-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 30px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      line-height: 1.6;
+    }
+    
+    .about-container h2, .about-container h3 {
+      color: var(--primary-color);
+      margin-bottom: 15px;
+      margin-top: 25px;
+    }
+    
+    .about-container h2:first-of-type {
+      margin-top: 0;
+    }
+    
+    .about-container p {
+      margin-bottom: 15px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+    
+    .about-container ul {
+      margin-left: 20px;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+    
+    .team-card {
+      background-color: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    
+    .api-link-box {
+      background-color: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 30px;
+      text-align: center;
+      font-weight: 600;
+    }
+    
+    .api-link-box a {
+      color: #15803d;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header class="header-bar">
+    <div class="brand">
+      <h1>Cidade de 15 Minutos</h1>
+    </div>
+    
+    <div class="controls">
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="index.html">Mapa</a>
+        <a href="comparar.html">Comparar</a>
+        <a href="sobre.html" class="active">Sobre</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Container de Conteúdo -->
+  <main class="about-container">
+    <h2>Sobre o Projeto</h2>
+    <p>
+      Este sistema é a implementação computacional do conceito de **"Cidade de 15 Minutos"**, proposto originalmente por Carlos Moreno. O conceito defende um planejamento urbano policêntrico, no qual os cidadãos devem conseguir acessar todos os serviços essenciais à vida (saúde, educação, comércio, lazer, combustível e transporte) em no máximo 15 minutos de caminhada a partir de suas residências.
+    </p>
+    <p>
+      O projeto faz parte do Trabalho de Conclusão de Curso intitulado **"Mensuração Computacional de Alcançabilidade Urbana: Cidade de 15 Minutos"** (UNIP, 2026), desenvolvido pelos alunos Bruno Nascimento, Guilherme Rocha e Pedro Henrique de Jesus. O objetivo é fornecer uma ferramenta analítica open-source para auxiliar gestores urbanos e a comunidade acadêmica a identificar vazios de infraestrutura urbana.
+    </p>
+    
+    <h3>Metodologia de Cálculo</h3>
+    <p>
+      O cálculo do índice de alcançabilidade individual por ponto e dos agregados municipais é realizado de forma robusta e otimizada:
+    </p>
+    <ul>
+      <li>Os tempos de acesso são mensurados sobre a **malha viária real do OpenStreetMap (OSM)**, considerando vias transitáveis de pedestres;</li>
+      <li>Adota-se uma velocidade média de caminhada conservadora de **3,0 km/h**;</li>
+      <li>Utiliza-se o algoritmo otimizado de **Dijkstra multi-source** por categoria de serviço para encontrar em lote o tempo mínimo até o estabelecimento mais próximo;</li>
+      <li>O índice individual do ponto é calculado como a porcentagem de categorias essenciais que o pedestre alcança em até 15 minutos a partir daquele nó.</li>
+    </ul>
+    
+    <div class="team-card">
+      <strong>Equipe de Desenvolvimento (UNIP 2026):</strong>
+      <ul style="margin-top: 5px; list-style-type: none; margin-left: 0;">
+        <li>🎓 Bruno Nascimento</li>
+        <li>🎓 Guilherme Rocha</li>
+        <li>🎓 Pedro Henrique de Jesus</li>
+      </ul>
+    </div>
+    
+    <div class="api-link-box">
+      Desenvolvedor? <a href="/api/docs" target="_blank">Use nossa API REST Pública</a> para integrar os dados e índices de alcançabilidade urbana nos seus próprios projetos.
+    </div>
+    
+    <h3>Licenças e Créditos</h3>
+    <p style="font-size:0.8rem; color:#64748b; margin-top:20px;">
+      Os dados geográficos utilizados neste projeto são fornecidos sob a licença Open Database License (ODbL) pelos colaboradores do **OpenStreetMap (OSM)**. A interface utiliza a biblioteca de mapas **Leaflet** sob licença BSD-2. As isócronas e análises de alcançabilidade são processadas usando Python, NetworkX e Shapely.
+    </p>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,352 @@
+/* CSS Neutro e Moderno para a Plataforma Cidade de 15 Minutos */
+
+:root {
+  --primary-color: #34495e;
+  --bg-color: #f7f7f7;
+  --panel-bg: #ffffff;
+  --text-color: #2c3e50;
+  --border-color: #e2e8f0;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  
+  --excelente: #1a9850;
+  --parcial: #d9ef8b;
+  --baixo: #d73027;
+  
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Barra Superior */
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 20px;
+  z-index: 1000;
+  height: 60px;
+}
+
+.brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.controls select {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  outline: none;
+}
+
+.controls select:focus-visible {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(52, 73, 94, 0.2);
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.nav-links a:hover {
+  background-color: #f1f5f9;
+}
+
+.nav-links a.active {
+  background-color: var(--primary-color);
+  color: #ffffff;
+}
+
+/* Container do Mapa + Painel */
+.main-container {
+  display: flex;
+  flex: 1;
+  position: relative;
+  height: calc(100vh - 60px);
+}
+
+#map {
+  flex: 1;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Painel Lateral */
+.side-panel {
+  width: 380px;
+  background-color: var(--panel-bg);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -2px 0 10px var(--shadow-color);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+}
+
+.side-panel.collapsed {
+  transform: translateX(100%);
+  position: absolute;
+  right: 0;
+  height: 100%;
+}
+
+.panel-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.panel-content {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Legenda do Mapa */
+.info.legend {
+  padding: 8px 12px;
+  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  border-radius: 5px;
+  line-height: 20px;
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.info.legend i {
+  width: 15px;
+  height: 15px;
+  float: left;
+  margin-right: 8px;
+  opacity: 0.7;
+  border-radius: 50%;
+}
+
+/* Badges de Índice */
+.index-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid var(--border-color);
+}
+
+.index-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.index-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #ffffff;
+}
+
+.index-label.excelente { background-color: var(--excelente); }
+.index-label.parcial { background-color: #d97706; } /* Amarelo escuro para melhor contraste */
+.index-label.baixo { background-color: var(--baixo); }
+
+/* Listas de Categorias */
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.category-item:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.category-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.category-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+
+.nearest-service {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+/* Checkboxes de Camadas */
+.layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.layer-control-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.layer-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.layer-checkbox input {
+  cursor: pointer;
+}
+
+/* Toasts */
+.toast-container {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  background-color: #ef4444;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  font-size: 0.85rem;
+  font-weight: 500;
+  pointer-events: auto;
+  animation: fadeInOut 3s forwards;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-10px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Spinner */
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsividade: Mobile bottom-sheet */
+@media (max-width: 768px) {
+  .main-container {
+    flex-direction: column;
+  }
+  
+  .side-panel {
+    width: 100%;
+    height: 45vh;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 10px var(--shadow-color);
+  }
+  
+  .side-panel.collapsed {
+    transform: translateY(100%);
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+  }
+}
