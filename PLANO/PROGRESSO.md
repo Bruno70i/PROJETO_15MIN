@@ -33,3 +33,6 @@ Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (e
 | Speedup obtido | — | ~44x (comparando tempos de cálculo em cache) |
 
 > **Nota metodológica a repassar à equipe**: os tempos médios da v2 NÃO são comparáveis aos da v1.1 — a v1.1 media a média até TODOS os serviços; a v2 mede até o MAIS PRÓXIMO por categoria, conforme a seção 2.3.2 do TCC. O texto do TCC deve ser atualizado com os números da v2 e uma frase explicando a correção metodológica.
+
+## Resumo do Estado do Sistema (Fase 06)
+A plataforma de alcançabilidade urbana está totalmente implementada e funcional de ponta a ponta. O banco de dados PostgreSQL armazena as tabelas do modelo de dados do TCC e as isócronas em JSONB. O algoritmo em Python foi otimizado com Dijkstra multi-source, atingindo um tempo de execução de 4.1s (speedup de ~44x) para Praia Grande. A API REST pública em Node.js/Express expõe os dados de consulta com documentação interativa em `/api/docs` e testes com 100% de cobertura. A interface web Leaflet+OSM permite escolher cidades, clicar no mapa, visualizar caminhos, ligar isócronas e renderizar o mapa de calor de forma responsiva.
