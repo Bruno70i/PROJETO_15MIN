@@ -124,7 +124,21 @@ export async function mostrarCaminhoServico(cidadeId, origem, servico, corHex) {
     });
     linha.bindPopup(`Caminho a pe pela malha viaria: <b>${rota.tempo_min.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} min</b>`);
 
-    linhaCaminho = L.featureGroup([casing, linha]).addTo(mapa);
+    const camadas = [casing, linha];
+
+    // Conector visual: pontilhado curto entre o ponto exato do clique e o
+    // inicio da rota (no da malha viaria mais proximo). Apenas estetico.
+    const inicio = rota.geojson.coordinates[0];
+    if (marcadorClique && inicio) {
+      const cliqueLatLng = marcadorClique.getLatLng();
+      const conector = L.polyline(
+        [[cliqueLatLng.lat, cliqueLatLng.lng], [inicio[1], inicio[0]]],
+        { color: '#475569', weight: 2, dashArray: '2, 6', opacity: 0.9 }
+      );
+      camadas.push(conector);
+    }
+
+    linhaCaminho = L.featureGroup(camadas).addTo(mapa);
     mapa.fitBounds(linhaCaminho.getBounds(), { padding: [50, 50] });
   } catch (error) {
     // Fallback: sem rota disponivel (cidade antiga sem arestas ou nos
@@ -208,11 +222,11 @@ export async function toggleHeatmap(cidadeId, categoria, ativo) {
     
     const circulos = pontos.map(p => {
       return L.circleMarker([p.lat, p.lon], {
-        radius: 4,
+        radius: 7,
         fillColor: getCorNo(p.tempo_min),
         color: '#ffffff',
-        weight: 0.5,
-        fillOpacity: 0.7
+        weight: 1,
+        fillOpacity: 0.85
       });
     });
     
