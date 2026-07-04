@@ -16,12 +16,33 @@
 | 09 Índice Moreno | ✅ concluída | 2026-07-03 | métrica da cidade inteira ("cidade de N minutos") |
 | 10 Análise configurável | ✅ concluída | 2026-07-03 | categorias selecionáveis + velocidade + mapa por serviço (sem reprocessar) |
 | 11 Página da API | ✅ concluída | 2026-07-03 | web/api.html com quickstart e exemplos reais |
+| 12 Identidade e gestão de cidades | ⬜ pendente | | geocodificação prévia (Nominatim), dedup por osm_id, atualizar/excluir |
+| 13 Vitrine de serviços | ⬜ pendente | | catálogo mestre + contagem Overpass + processamento seletivo |
+| 14 Análise pessoal | ⬜ pendente | | casa/trabalho no mapa, veredito da rotina (só frontend) |
 
 Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (explicar)
 
 ## Desvios do plano
 - A senha do PostgreSQL local era '123' em vez de 'quinze15' (ajustado no .env).
 - O processamento de Paris foi pulado devido a limites de recursos da máquina de execução (memória RAM < 8GB), conforme permitido pelas instruções.
+
+## Limpeza do banco e descoberta de Paris (03/07/2026, agente principal)
+- Removida a duplicata Guarujá "..., Brasil" (id 27, re-criada pela
+  interface); mantido id 25 "..., Brazil". Causa raiz endereçada na fase 12
+  (identidade por osm_id).
+- **Paris processou por completo** via interface (consulta "Paris,"):
+  77.075 nós, 12 categorias, Moreno gravado. Corrigido `pais` de '' para
+  'France' (artefato do parser de vírgula).
+- **Números finais consolidados (metodologia v2, mais próximo por categoria, 3 km/h):**
+  | Cidade | Tempo médio | Índice geral | Minutos da cidade (P90) | Cobertura plena | Gargalo |
+  |---|---|---|---|---|---|
+  | Paris | 12,87 min | 75,35 | 69 | 2,34% | Rodoviárias (8,37%) |
+  | Águas de São Pedro | 15,81 min | 33,36 | 35 | 12,30% | Escolas (29,02%) |
+  | Praia Grande | 41,23 min | 29,07 | 179 | 0,22% | Rodoviárias (8,29%) |
+  | Guarujá | 44,99 min | 27,95 | 161 | 0,00% | Creches (8,06%) |
+- **A comparação central do TCC está restaurada e ampliada**: Paris
+  12,87 min × Praia Grande 41,23 min (v1.1 reportava 13 × 23 com
+  metodologia antiga). Usar estes números na atualização do texto.
 
 ## Verificação pós-fases 10/11 (03/07/2026, agente principal)
 - Testes: 5 pytest + 17 vitest verdes. Commit `94a4b35` (o executor havia
