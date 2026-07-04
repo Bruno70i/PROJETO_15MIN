@@ -18,7 +18,7 @@
 | 11 Página da API | ✅ concluída | 2026-07-03 | web/api.html com quickstart e exemplos reais |
 | 12 Identidade e gestão de cidades | ⬜ pendente | | geocodificação prévia (Nominatim), dedup por osm_id, atualizar/excluir |
 | 13 Vitrine de serviços | ⬜ pendente | | catálogo mestre + contagem Overpass + processamento seletivo |
-| 14 Análise pessoal | ⬜ pendente | | casa/trabalho no mapa, veredito da rotina (só frontend) |
+| 14 Moradia e trabalho (6 pilares) | ⬜ pendente | | modo livre intocado + modo completo: casa/trabalho entram no cálculo dinâmico |
 
 Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (explicar)
 

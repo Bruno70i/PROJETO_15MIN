@@ -1,118 +1,162 @@
-# FASE 14 — Análise pessoal: minha casa, meu trabalho
+# FASE 14 — Moradia e trabalho no cálculo: o diagnóstico de 6 pilares
 
-> **Para o agente executor**: leia `00_LEIA_PRIMEIRO.md`. Restrição
-> INEGOCIÁVEL desta fase: **nenhuma alteração no algoritmo Python, no
-> banco de dados ou no diagnóstico de Moreno** — a métrica oficial
-> permanece exatamente como está. Esta fase é 100% frontend + endpoints já
-> existentes (`/alcancabilidade` e `/rota`). É independente das fases
-> 12/13 (pode ser executada antes ou depois).
+> **Para o agente executor**: leia `00_LEIA_PRIMEIRO.md`. Restrições
+> INEGOCIÁVEIS: (1) o **modo livre** — tudo o que existe hoje — permanece
+> byte a byte com o mesmo comportamento; (2) **nenhuma alteração** em
+> `algorithm/` (Python), no `db\schema.sql` e no diagnóstico Moreno
+> GRAVADO (tabela `indice_moreno`); os cálculos novos são dinâmicos
+> (na hora, via API) e nada deles é persistido. A fase toca a API (uma
+> extensão de endpoint) e o frontend.
 
-## 14.0 Objetivo
+## 14.0 O problema que esta fase resolve (contexto para o TCC)
 
-O diagnóstico atual mede a CIDADE (métrica territorial de Moreno) e
-qualquer PONTO clicado. Falta a pergunta do cidadão: **"a MINHA rotina
-cabe em 15 minutos?"** — envolvendo os dois pilares de Moreno que a
-métrica territorial não cobre por dados: moradia (onde EU moro) e trabalho
-(onde EU trabalho). Esta fase cria a análise pessoal como camada
-complementar, com dois marcadores fixáveis no mapa e um cartão próprio.
+O conceito de Carlos Moreno tem 6 pilares: **moradia, trabalho, comércio,
+saúde, educação e lazer**. O sistema atual mede 4 deles por POIs do
+OpenStreetMap; moradia e trabalho não são mensuráveis por POI (trabalho de
+cada pessoa é um lugar diferente; moradia é o ponto de partida, não um
+destino). Esta fase fecha a lacuna com dois marcadores definidos pelo
+usuário — 🏠 casa e 💼 trabalho — e passa a oferecer DOIS modos:
 
-## 14.1 Interação
+| Modo | O que considera | Estado |
+|---|---|---|
+| **Livre** (padrão) | Somente os serviços do OSM — exatamente o sistema de hoje | INTOCADO |
+| **Completo (6 pilares)** | Serviços do OSM **+ trabalho como destino adicional + casa como origem pessoal** | NOVO |
 
-1. No painel lateral, novo bloco **"Minha análise"** (visível quando há
-   cidade selecionada) com dois botões: `🏠 Definir minha casa` e
-   `💼 Definir meu trabalho`.
-2. Clicar num botão entra em "modo de captura": o cursor do mapa vira
-   crosshair, um aviso flutuante diz "clique no mapa para marcar sua
-   casa/trabalho" e o PRÓXIMO clique no mapa define o marcador (esse
-   clique NÃO dispara a análise de ponto normal — suprima o handler
-   padrão enquanto o modo de captura estiver ativo; tecla Esc cancela).
-3. Marcadores persistentes e distintos dos demais: casa = pino com emoji
-   🏠 (L.divIcon), trabalho = 💼. Arrastáveis (`draggable: true`) — soltar
-   recalcula.
+Papéis conceituais (fixar em comentário no código e no texto da UI):
+- **Moradia = ORIGEM**. No modo livre, todo nó do território age como uma
+  "casa possível" (é o que faz a métrica ser territorial). No modo
+  completo, a casa marcada ancora o veredito pessoal.
+- **Trabalho = DESTINO**. Entra no cálculo como uma categoria adicional
+  com um único local (como uma rodoviária): mede-se, de cada origem, o
+  tempo a pé até ele.
+
+## 14.1 Interação (marcadores)
+
+1. Bloco **"Minha análise"** no painel (com cidade selecionada): botões
+   `🏠 Definir minha casa` e `💼 Definir meu trabalho`.
+2. Modo de captura: cursor crosshair + aviso "clique no mapa para marcar";
+   o próximo clique define o marcador e NÃO dispara a análise de ponto
+   normal (suprimir o handler padrão durante a captura; Esc cancela).
+3. Marcadores `L.divIcon` com 🏠/💼, arrastáveis (`draggable: true` —
+   soltar recalcula tudo que estiver ativo).
 4. Persistência: `localStorage`, chave `analise_pessoal_<cidade_id>`
-   (JSON `{casa: {lat, lon}, trabalho: {lat, lon}}`). Ao trocar de cidade,
-   carregar os marcadores daquela cidade, se existirem. Botão "limpar"
-   remove os dois.
+   (`{casa:{lat,lon}, trabalho:{lat,lon}}`), por cidade. Botão "limpar".
+5. Alternador visível no topo do cartão Moreno:
+   `( ) Modo livre  (•) Modo completo (6 pilares)` — a opção "completo" só
+   habilita quando **casa E trabalho** estão marcados na cidade atual
+   (tooltip explica). Padrão: livre.
 
-## 14.2 Cálculo (somente APIs existentes)
+## 14.2 Veredito pessoal (a partir da CASA) — cálculo no frontend
 
-Com CASA definida:
-- `GET /alcancabilidade?cidade_id&lat&lon` da casa (com a velocidade
-  selecionada no painel, se a fase 10 estiver ativa) → tempos por
-  categoria a partir de casa + `no.osm_id` da casa.
+Com casa definida (e trabalho, se houver), usando APENAS endpoints
+existentes:
+- `GET /alcancabilidade` na casa (com a velocidade do painel) → tempos por
+  categoria + `no.osm_id` da casa.
+- `GET /alcancabilidade` no trabalho → `no.osm_id` do trabalho.
+- `GET /rota?de=<no_casa>&para=<no_trabalho>[&velocidade]` → tempo
+  casa→trabalho + traçado (desenhar em roxo `#7c3aed`, casing branco,
+  popup "Casa → Trabalho: N min a pé").
 
-Com CASA e TRABALHO definidos:
-- `GET /alcancabilidade` do trabalho → obtém `no.osm_id` do trabalho
-  (é o jeito já existente de resolver "coordenada → nó"; não crie endpoint
-  novo).
-- `GET /rota?cidade_id&de=<no_casa>&para=<no_trabalho>[&velocidade]` →
-  tempo e traçado casa→trabalho.
-- Desenhar a rota casa→trabalho no mapa com o mesmo padrão visual das
-  rotas (casing branco + linha), na cor **#7c3aed** (roxa, distinta das
-  categorias), com popup "Casa → Trabalho: N min a pé".
-
-### Veredito pessoal (fórmula fechada)
 ```
-tempo_trabalho   = tempo da rota casa→trabalho (min)
-pior_servico     = max(tempo_min das categorias com serviço, a partir de casa)
-minutos_rotina   = max(tempo_trabalho, pior_servico)      [se trabalho definido]
-                 = pior_servico                            [se só casa definida]
-atende           = minutos_rotina <= 15
+pior_servico   = max(tempo_min das categorias com serviço, a partir da casa)
+minutos_rotina = max(tempo_casa_trabalho, pior_servico)   [com trabalho]
+               = pior_servico                              [só casa]
+atende_pessoal = minutos_rotina <= 15
 ```
-Exibir também qual item definiu o `minutos_rotina` (o trabalho ou qual
-serviço). Se casa e trabalho estiverem em cidades processadas diferentes,
-ou a rota retornar 404: mostrar "sem caminho a pé calculável entre casa e
-trabalho nesta base" e calcular o veredito só com os serviços (explicando
-isso no cartão).
+Cartão: destaque **"Para você, esta é uma cidade de N minutos"** + selo
+(≤15 verde "Sua rotina cabe no conceito" / vermelho "fora"), linha
+TRABALHO no topo (💼 tempo, ✅/⚠️, clicável para redesenhar a rota),
+depois a lista de serviços a partir da casa (reutilizar a renderização da
+análise de ponto; linhas clicáveis → `mostrarCaminhoServico` com origem =
+nó da casa), e o item que definiu o `minutos_rotina` destacado
+("gargalo da sua rotina: Trabalho, 22 min").
 
-## 14.3 Cartão "Minha análise" (layout)
+## 14.3 Diagnóstico da CIDADE incluindo o trabalho — extensão da API
 
-1. Título "Minha análise" + botão limpar.
-2. Estado vazio: instrução curta ("defina sua casa para começar").
-3. Com dados:
-   - Destaque: **"Sua rotina cabe em N minutos"** + selo verde
-     (`N ≤ 15`: "Dentro do conceito") ou vermelho ("Fora do conceito").
-   - Linha TRABALHO no topo (💼, tempo casa→trabalho, ✅/⚠️) — clicável
-     para re-desenhar a rota no mapa.
-   - Lista de serviços a partir de casa (mesmo componente visual da
-     análise de ponto; reutilize a renderização existente), cada linha
-     clicável para traçar a rota casa→serviço (função
-     `mostrarCaminhoServico` já existente, passando o nó da casa como
-     origem).
-   - Rodapé pequeno: "Análise pessoal — não altera o diagnóstico da
-     cidade. Seus pontos ficam salvos apenas neste navegador."
-4. O cartão convive com os já existentes: ordem no painel = Diagnóstico da
-   cidade → Minha análise → (análise de ponto quando houver clique
-   normal). O botão "← Diagnóstico da Cidade" existente continua
-   funcionando.
+É a parte que faz a CIDADE ser reavaliada com o pilar trabalho: o local de
+trabalho marcado vira uma categoria virtual "Trabalho (informado)" com um
+único destino, e o Moreno é recalculado dinamicamente.
 
-## 14.4 Privacidade (registrar no sobre.html e no TCC)
+### `GET /api/v1/cidades/:id/moreno` — novo parâmetro `trabalho_no=<osm_id>`
+(compõe com os já existentes `categorias` e `velocidade` da fase 10)
 
-Casa e trabalho NUNCA são enviados para armazenamento no servidor — as
-coordenadas só transitam nas consultas GET já existentes (stateless) e
-ficam salvas apenas no `localStorage` do navegador do usuário. Acrescente
-um parágrafo no `sobre.html` dizendo exatamente isso.
+Implementação (em Node, SEM tocar no Python):
+1. Valide `trabalho_no` (inteiro; deve existir em `no` da cidade — 400 se
+   não).
+2. Reutilize o grafo em memória do `rota.js` (`carregarGrafo(cidadeId)`).
+   Extraia a função `dijkstra` para um módulo compartilhado
+   (`src\lib\grafo.js`) e crie a variante **sem destino** (expansão
+   completa) retornando o Map de distâncias de TODOS os nós até a origem:
+   ```js
+   // dijkstraCompleto(adj, origem) -> Map<no, tempoSegundos>
+   // igual ao dijkstra existente, sem early-exit e sem reconstruir caminho
+   ```
+   Rode a partir do nó do trabalho (rede de pedestre é bidirecional na
+   prática — documentar). Custo: milissegundos para ~21k arestas.
+3. Combine com os dados por nó do SQL da fase 10: para cada nó,
+   `tempo_pior_completo = max(tempo_pior_servicos, tempo_ate_trabalho)`
+   — aplicando o fator de velocidade a AMBOS; nós sem caminho ao trabalho
+   → sem cobertura plena (mesma semântica de NULL da fase 09.
+   Implementação sugerida: traga `osm_no_id, tempo_pior` por nó do SQL
+   (a CTE `por_no` da fase 10 sem os agregados) e faça o merge + agregados
+   (P90, cobertura, histograma, gargalo) em JS — os agregados JS já
+   existem? Se não, implemente uma vez em `src\lib\moreno.js` e reuse).
+4. Resposta: mesmo shape do moreno dinâmico + no array de coberturas a
+   entrada `{chave:"trabalho_pessoal", rotulo:"Trabalho (informado)",
+   cor:"#7c3aed", pct_dentro:...}` e
+   `parametros.trabalho_no = <osm_id>`.
+5. `openapi.yaml` atualizado; nada é gravado no banco.
+
+### Frontend — modo completo ligado
+- Cartão Moreno chama `/moreno?...&trabalho_no=<no_do_trabalho>` e exibe,
+  ACIMA do bloco padrão: **"Com moradia e trabalho: cidade de N minutos"**
+  + selo, cobertura plena recalculada, e "Trabalho (informado)" aparece na
+  lista de cobertura por serviço (com % do território que alcança o SEU
+  trabalho em 15 min) e como opção no mapa de calor (categoria virtual —
+  para o heatmap dela, use `/mapa?categoria=plena`? NÃO: o heatmap do
+  trabalho exige os tempos por nó ao trabalho; adicione ao retorno do
+  moreno dinâmico um campo OPCIONAL `amostra_trabalho` com até 3000
+  `{lat,lon,tempo_min}` quando `trabalho_no` é passado E
+  `incluir_amostra=1` — o frontend usa isso para pintar a camada).
+- Voltar para "Modo livre" → cartão volta ao diagnóstico padrão (nada de
+  trabalho na conta). O diagnóstico OFICIAL gravado nunca muda.
+
+## 14.4 Privacidade (nota obrigatória na UI e no sobre.html)
+
+Casa e trabalho não são armazenados no servidor: ficam no `localStorage`
+do navegador e transitam apenas como parâmetros de consultas stateless.
+Texto no rodapé do cartão: "Análise com dados pessoais — seus pontos ficam
+salvos apenas neste navegador e não alteram o diagnóstico público da
+cidade."
 
 ## 14.5 Validação manual
 
-1. Definir casa e trabalho no Guarujá → veredito coerente (conferir na mão:
-   o `minutos_rotina` = max exibido nas linhas).
-2. Arrastar o marcador da casa → recálculo automático.
-3. Recarregar a página → marcadores e análise voltam (localStorage).
-4. Trocar para outra cidade → cartão zera (ou carrega os pontos daquela
-   cidade); voltar → pontos do Guarujá reaparecem.
-5. Definir trabalho do outro lado do estuário (sem ponte caminhável) →
-   mensagem de rota indisponível, sem crash.
-6. Clique normal no mapa continua funcionando como antes quando NÃO está
-   em modo de captura.
+1. Guarujá, casa no centro, trabalho na Enseada → veredito pessoal confere
+   com as linhas (max na mão); rota roxa segue as ruas.
+2. Ligar "Modo completo" → "cidade de N minutos" MAIOR ou igual ao modo
+   livre (adicionar um destino nunca melhora o pior caso — se vier menor,
+   há bug); "Trabalho (informado)" listado na cobertura por serviço.
+3. Voltar ao modo livre → números idênticos aos de antes da fase (regressão
+   zero — comparar com print/valores anotados).
+4. Arrastar a casa → recálculo; recarregar página → tudo volta; trocar de
+   cidade e voltar → pontos preservados por cidade.
+5. Trabalho inalcançável a pé (outro lado do estuário) → tratado sem crash
+   (mensagem no cartão; cidade sem cobertura plena no modo completo).
+6. `pytest` inalterado passa (nada do Python mudou); vitest com 2 testes
+   novos: `/moreno?trabalho_no=<válido>` → 200 com `trabalho_pessoal` na
+   resposta e minutos ≥ modo livre; `trabalho_no=999` inexistente → 400.
 
 ## 14.6 Critérios de aceite
 
-- [ ] Zero mudanças em `algorithm/`, `db/schema.sql` e endpoints (somente
-      frontend) — `git diff` da fase deve tocar apenas `web\`
-- [ ] Marcadores 🏠/💼 fixáveis, arrastáveis e persistentes por cidade
-- [ ] Veredito "Sua rotina cabe em N minutos" com a fórmula da 14.2
-- [ ] Rota casa→trabalho desenhada em roxo pela malha viária
-- [ ] Casos de erro tratados (cidades distintas, rota 404, só casa)
-- [ ] Nota de privacidade no cartão e no sobre.html
-- [ ] Checklist 14.5 completo; commit; PROGRESSO atualizado
+- [ ] `git diff` da fase toca somente `api\src\` (rota moreno + libs),
+      `api\openapi.yaml`, `api\tests\` e `web\` — nunca `algorithm\` ou
+      `db\schema.sql`
+- [ ] Modo livre 100% preservado (teste de regressão 14.5-3)
+- [ ] Marcadores 🏠/💼 fixáveis, arrastáveis, persistentes por cidade
+- [ ] Veredito pessoal "Para você, esta é uma cidade de N minutos"
+- [ ] Modo completo recalcula o diagnóstico da cidade com o trabalho como
+      destino adicional, incluindo camada no mapa de calor
+- [ ] Nota de privacidade presente; casos de erro tratados
+- [ ] Testes verdes; commit; PROGRESSO atualizado (registrar que o sistema
+      passa a cobrir os 6 pilares de Moreno quando casa+trabalho são
+      informados — argumento para o TCC)
