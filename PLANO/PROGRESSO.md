@@ -26,6 +26,33 @@ Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (e
 - A senha do PostgreSQL local era '123' em vez de 'quinze15' (ajustado no .env).
 - O processamento de Paris foi pulado devido a limites de recursos da máquina de execução (memória RAM < 8GB), conforme permitido pelas instruções.
 
+## Auditoria das fases 12–14 (04/07/2026, agente principal) — commit 78650d0
+Três defeitos encontrados e corrigidos (o walkthrough do executor declarava
+tudo verificado, mas o pytest não tinha sido rodado e o frontend estava
+morto):
+1. **`algorithm\db.py` (etapa 6.8)**: `NameError` — variável `categorias`
+   inexistente no escopo; TODO processamento de cidade quebrava no fim da
+   gravação (rollback). Corrigido: `cli.py` passa `categorias_processadas`
+   em `resultados`; teste de integração agora cobre a etapa (antes montava
+   `resultados` sem o campo e o bug era invisível ao teste).
+2. **`api\src\routes\geocodificar.js`**: no `format=jsonv2` do Nominatim o
+   campo é `category` (não `class`); o filtro derrubava todos os candidatos
+   → busca sempre vazia. Corrigido (aceita ambos); teste do vitest
+   endurecido — lista vazia para "Praia Grande" agora reprova.
+3. **`web\js\app.js` corrompido**: edição truncou a string do
+   `mostrarToast` e engoliu o fechamento do catch/função → erro de sintaxe
+   → NENHUM módulo do frontend carregava ("Carregando cidades..." eterno).
+   Reparado; sintaxe dos 6 módulos validada com `node --check`.
+Extras: Águas de São Pedro reprocessada (recuperou `cidade_categoria` — o
+teste de integração a recria sem esses vínculos); backfill `osm_limite`
+completo (4/4 com relation id: Águas 297918, PG 298316, Guarujá 298463,
+Paris 7444); `cache/` adicionada ao .gitignore.
+Validações finais: pytest 5/5, vitest 24/24; regressão do modo livre
+confirmada (Guarujá 161/0% idêntico); Moreno com `trabalho_no` monotônico
+(174 ≥ 161) com `trabalho_pessoal` em `categorias_resultado`; vitrine de
+Águas retornou 20 itens com contagens; fluxo completo de busca verificado
+em navegador real ("Santos" → 2 candidatos com Selecionar).
+
 ## Limpeza do banco e descoberta de Paris (03/07/2026, agente principal)
 - Removida a duplicata Guarujá "..., Brasil" (id 27, re-criada pela
   interface); mantido id 25 "..., Brazil". Causa raiz endereçada na fase 12
