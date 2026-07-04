@@ -1,5 +1,7 @@
 import express from 'express';
 import pool from '../db.js';
+import { iniciarJob, getJobAtual } from './processamentos.js';
+import { carregarGrafo, dijkstraCompleto } from '../lib/grafo.js';
 
 const router = express.Router();
 
@@ -119,11 +121,41 @@ router.get('/:id', async (req, res, next) => {
       };
     }
     
+    const catProcessedRes = await pool.query(`
+      SELECT cat.chave, cat.rotulo, cat.cor_hex
+      FROM cidade_categoria cc
+      JOIN categoria_servico cat ON cat.id = cc.categoria_id
+      WHERE cc.cidade_id = $1
+      ORDER BY cat.id ASC
+    `, [cidadeId]);
+    
+    let categorias_processadas = catProcessedRes.rows.map(r => ({
+      chave: r.chave,
+      rotulo: r.rotulo,
+      cor_hex: r.cor_hex
+    }));
+
+    if (categorias_processadas.length === 0) {
+      const allCatsRes = await pool.query(`
+        SELECT chave, rotulo, cor_hex
+        FROM categoria_servico
+        WHERE id != 0
+        ORDER BY id ASC
+      `);
+      categorias_processadas = allCatsRes.rows.map(r => ({
+        chave: r.chave,
+        rotulo: r.rotulo,
+        cor_hex: r.cor_hex
+      }));
+    }
+
     res.json({
       id: c.id,
       nome: c.nome,
       pais: c.pais,
       consulta_osm: c.consulta_osm,
+      osm_limite_tipo: c.osm_limite_tipo,
+      osm_limite_id: c.osm_limite_id ? parseInt(c.osm_limite_id, 10) : null,
       data_calculo: c.data_calculo,
       qtd_nos: c.qtd_nos,
       qtd_arestas: c.qtd_arestas,
@@ -131,7 +163,8 @@ router.get('/:id', async (req, res, next) => {
       velocidade_kmh: parseFloat(c.velocidade_kmh),
       limiar_minutos: c.limiar_minutos,
       indices,
-      moreno
+      moreno,
+      categorias_processadas
     });
   } catch (error) {
     next(error);
@@ -315,7 +348,7 @@ router.get('/:id/mapa', async (req, res, next) => {
 // 6. GET /cidades/:id/moreno - Diagnóstico Moreno Dinâmico (Fase 10)
 router.get('/:id/moreno', async (req, res, next) => {
   const { id } = req.params;
-  const { categorias, velocidade } = req.query;
+  const { categorias, velocidade, trabalho_no } = req.query;
   const cidadeId = parseInt(id, 10);
   
   if (isNaN(cidadeId)) {
@@ -343,7 +376,27 @@ router.get('/:id/moreno', async (req, res, next) => {
     }
     const fator = velBase / velEscolhida;
 
-    // 3. Busca categorias
+    // 3. Valida nó do trabalho se fornecido
+    let trabalhoNoStr = null;
+    let distTrabalho = null;
+    if (trabalho_no) {
+      trabalhoNoStr = String(trabalho_no);
+      const checkNode = await pool.query("SELECT 1 FROM no WHERE cidade_id = $1 AND osm_id = $2", [cidadeId, trabalhoNoStr]);
+      if (checkNode.rowCount === 0) {
+        return res.status(400).json({ erro: "Nó do trabalho informado não existe nesta cidade.", codigo: 400 });
+      }
+
+      const adj = await carregarGrafo(cidadeId);
+      if (!adj) {
+        return res.status(404).json({
+          erro: 'Cidade não encontrada ou sem malha viária para cálculo.',
+          codigo: 404
+        });
+      }
+      distTrabalho = dijkstraCompleto(adj, trabalhoNoStr);
+    }
+
+    // 4. Busca categorias
     const catRes = await pool.query("SELECT id, chave, rotulo, cor_hex FROM categoria_servico WHERE id != 0");
     const todasCategorias = catRes.rows;
     const chaveParaCat = new Map(todasCategorias.map(c => [c.chave, c]));
@@ -390,28 +443,80 @@ router.get('/:id/moreno', async (req, res, next) => {
 
     const idsEscolhidos = categoriasEscolhidas.map(c => c.id);
 
-    // 4. Executa query dinâmica de Moreno
-    const mainQuery = `
-      WITH por_no AS (
-        SELECT a.osm_no_id,
-               CASE WHEN bool_and(a.tempo_min IS NOT NULL)
-                    THEN max(a.tempo_min * $3) END AS tempo_pior
-        FROM alcancabilidade_no a
-        WHERE a.cidade_id = $1 AND a.categoria_id = ANY($2)
-        GROUP BY a.osm_no_id
-      )
-      SELECT count(*)                                            AS total_nos,
-             round(100.0 * avg((tempo_pior <= $4)::int), 2)      AS pct_cobertura_plena,
-             round(100.0 * avg((tempo_pior IS NULL)::int), 2)    AS pct_nos_sem_cobertura,
-             percentile_cont(0.9) WITHIN GROUP (ORDER BY tempo_pior) AS p90,
-             percentile_cont(0.5) WITHIN GROUP (ORDER BY tempo_pior) AS mediana,
-             avg(tempo_pior)                                     AS media
-      FROM por_no;
+    // 5. Query de alcançabilidade dos nós para as categorias escolhidas
+    const nodesQuery = `
+      SELECT a.osm_no_id,
+             CASE WHEN bool_and(a.tempo_min IS NOT NULL)
+                  THEN max(a.tempo_min) END AS tempo_pior
+      FROM alcancabilidade_no a
+      WHERE a.cidade_id = $1 AND a.categoria_id = ANY($2)
+      GROUP BY a.osm_no_id;
     `;
-    const resultRes = await pool.query(mainQuery, [cidadeId, idsEscolhidos, fator, limiar]);
-    const mainStats = resultRes.rows[0];
+    const nodesRes = await pool.query(nodesQuery, [cidadeId, idsEscolhidos]);
 
-    // 5. Query de Cobertura por categoria
+    const totalNos = nodesRes.rows.length;
+    let countDentroLimiar = 0;
+    let countSemCobertura = 0;
+    const temposValidos = [];
+
+    for (const r of nodesRes.rows) {
+      const noId = String(r.osm_no_id);
+      const tempoPiorServicos = r.tempo_pior !== null ? parseFloat(r.tempo_pior) : null;
+
+      let tempoPior = null;
+      if (trabalhoNoStr) {
+        const tempoSeg = distTrabalho.get(noId);
+        if (tempoSeg !== undefined && tempoPiorServicos !== null) {
+          const tempoMinTrabalho = tempoSeg / 60;
+          tempoPior = Math.max(tempoPiorServicos, tempoMinTrabalho) * fator;
+        } else {
+          tempoPior = null;
+        }
+      } else {
+        tempoPior = tempoPiorServicos !== null ? tempoPiorServicos * fator : null;
+      }
+
+      if (tempoPior === null) {
+        countSemCobertura++;
+      } else {
+        temposValidos.push(tempoPior);
+        if (tempoPior <= limiar) {
+          countDentroLimiar++;
+        }
+      }
+    }
+
+    const pctCoberturaPlena = totalNos > 0 ? parseFloat((100.0 * countDentroLimiar / totalNos).toFixed(2)) : 0.0;
+    const pctNosSemCobertura = totalNos > 0 ? parseFloat((100.0 * countSemCobertura / totalNos).toFixed(2)) : 0.0;
+
+    // Percentil P90, Mediana e Média
+    temposValidos.sort((a, b) => a - b);
+    const getPercentile = (arr, p) => {
+      if (arr.length === 0) return null;
+      const idx = (arr.length - 1) * p;
+      const base = Math.floor(idx);
+      const rest = idx - base;
+      if (arr[base + 1] !== undefined) {
+        return arr[base] + rest * (arr[base + 1] - arr[base]);
+      }
+      return arr[base];
+    };
+
+    const p90 = getPercentile(temposValidos, 0.9);
+    const mediana = getPercentile(temposValidos, 0.5);
+    const media = temposValidos.length > 0 ? temposValidos.reduce((sum, t) => sum + t, 0) / temposValidos.length : null;
+
+    const minutosCidade = p90 !== null ? Math.ceil(p90) : null;
+    const atendeConceito = minutosCidade !== null ? minutosCidade <= limiar : false;
+
+    let classificacao = "Distante do conceito";
+    if (minutosCidade !== null) {
+      if (minutosCidade <= 15) classificacao = "Cidade de 15 Minutos";
+      else if (minutosCidade <= 20) classificacao = "Muito proxima do conceito";
+      else if (minutosCidade <= 30) classificacao = "Parcialmente aderente";
+    }
+
+    // 6. Cobertura por categoria
     const listQuery = `
       SELECT a.categoria_id,
              round(100.0 * avg((a.tempo_min IS NOT NULL AND a.tempo_min * $3 <= $4)::int), 2) AS pct_dentro
@@ -420,7 +525,7 @@ router.get('/:id/moreno', async (req, res, next) => {
       GROUP BY a.categoria_id;
     `;
     const listRes = await pool.query(listQuery, [cidadeId, idsEscolhidos, fator, limiar]);
-    
+
     let gargalo = null;
     let minPct = 101.0;
     const categoriasResultado = [];
@@ -447,24 +552,35 @@ router.get('/:id/moreno', async (req, res, next) => {
       }
     });
 
-    // 6. Histograma
-    const histQuery = `
-      WITH por_no AS (
-        SELECT a.osm_no_id,
-               CASE WHEN bool_and(a.tempo_min IS NOT NULL)
-                    THEN max(a.tempo_min * $3) END AS tempo_pior
-        FROM alcancabilidade_no a
-        WHERE a.cidade_id = $1 AND a.categoria_id = ANY($2)
-        GROUP BY a.osm_no_id
-      )
-      SELECT tempo_pior FROM por_no;
-    `;
-    const histRes = await pool.query(histQuery, [cidadeId, idsEscolhidos, fator]);
-    
-    const tempos = histRes.rows.map(r => r.tempo_pior).filter(t => t !== null && t !== undefined);
-    const totalNos = histRes.rowCount;
-    const countSemCobertura = totalNos - tempos.length;
+    if (trabalhoNoStr) {
+      let countDentroTrabalho = 0;
+      for (const r of nodesRes.rows) {
+        const noId = String(r.osm_no_id);
+        const tSeg = distTrabalho.get(noId);
+        if (tSeg !== undefined && (tSeg / 60) * fator <= limiar) {
+          countDentroTrabalho++;
+        }
+      }
+      const pctDentroTrabalho = parseFloat((100.0 * countDentroTrabalho / totalNos).toFixed(2));
+      categoriasResultado.push({
+        chave: "trabalho_pessoal",
+        rotulo: "Trabalho (informado)",
+        cor_hex: "#7c3aed",
+        pct_dentro: pctDentroTrabalho
+      });
 
+      if (pctDentroTrabalho < minPct) {
+        minPct = pctDentroTrabalho;
+        gargalo = {
+          chave: "trabalho_pessoal",
+          rotulo: "Trabalho (informado)",
+          cor_hex: "#7c3aed",
+          pct: pctDentroTrabalho
+        };
+      }
+    }
+
+    // Histograma
     const bins = [
       { faixa: '0_5', min: 0, max: 5, qtd: 0 },
       { faixa: '5_10', min: 5, max: 10, qtd: 0 },
@@ -475,7 +591,7 @@ router.get('/:id/moreno', async (req, res, next) => {
       { faixa: 'mais_30', min: 30, max: Infinity, qtd: 0 },
     ];
 
-    tempos.forEach(t => {
+    temposValidos.forEach(t => {
       for (const b of bins) {
         if (t > b.min && t <= b.max) {
           b.qtd++;
@@ -490,24 +606,28 @@ router.get('/:id/moreno', async (req, res, next) => {
     const distribuicao = bins.map(b => ({ faixa: b.faixa, qtd: b.qtd }));
     distribuicao.push({ faixa: 'sem_cobertura', qtd: countSemCobertura });
 
-    const p90 = mainStats.p90 !== null ? parseFloat(mainStats.p90) : null;
-    const minutosCidade = p90 !== null ? Math.ceil(p90) : null;
-    const atendeConceito = minutosCidade !== null ? minutosCidade <= limiar : false;
-
-    let classificacao = "Distante do conceito";
-    if (minutosCidade !== null) {
-      if (minutosCidade <= 15) classificacao = "Cidade de 15 Minutos";
-      else if (minutosCidade <= 20) classificacao = "Muito proxima do conceito";
-      else if (minutosCidade <= 30) classificacao = "Parcialmente aderente";
+    // Opcional: amostra para heatmap do trabalho
+    let amostra_trabalho = undefined;
+    if (trabalhoNoStr && req.query.incluir_amostra === '1') {
+      const geoNodesRes = await pool.query("SELECT osm_id, lat, lon FROM no WHERE cidade_id = $1", [cidadeId]);
+      const amostra = geoNodesRes.rows.map(node => {
+        const tempoSeg = distTrabalho.get(String(node.osm_id));
+        return {
+          lat: parseFloat(node.lat),
+          lon: parseFloat(node.lon),
+          tempo_min: tempoSeg !== undefined ? parseFloat(((tempoSeg / 60) * fator).toFixed(2)) : null
+        };
+      });
+      amostra_trabalho = amostra.sort(() => 0.5 - Math.random()).slice(0, 3000);
     }
 
     res.json({
       limiar_minutos: limiar,
-      pct_cobertura_plena: mainStats.pct_cobertura_plena !== null ? parseFloat(mainStats.pct_cobertura_plena) : 0.0,
+      pct_cobertura_plena: pctCoberturaPlena,
       minutos_cidade: minutosCidade,
-      tempo_pior_medio: mainStats.media !== null ? parseFloat(mainStats.media) : null,
-      tempo_pior_mediana: mainStats.mediana !== null ? parseFloat(mainStats.mediana) : null,
-      pct_nos_sem_cobertura: mainStats.pct_nos_sem_cobertura !== null ? parseFloat(mainStats.pct_nos_sem_cobertura) : 0.0,
+      tempo_pior_medio: media !== null ? parseFloat(media.toFixed(2)) : null,
+      tempo_pior_mediana: mediana !== null ? parseFloat(mediana.toFixed(2)) : null,
+      pct_nos_sem_cobertura: pctNosSemCobertura,
       atende_conceito: atendeConceito,
       classificacao: classificacao,
       categoria_gargalo: gargalo ? {
@@ -519,15 +639,114 @@ router.get('/:id/moreno', async (req, res, next) => {
       categorias_ausentes: categoriasAusentesQuery.map(c => ({ chave: c.chave, rotulo: c.rotulo })),
       distribuicao: distribuicao,
       categorias_resultado: categoriasResultado,
+      amostra_trabalho,
       parametros: {
         categorias_usadas: categoriasEscolhidas.map(c => c.chave),
         velocidade_kmh: velEscolhida,
+        trabalho_no: trabalhoNoStr,
         dinamico: true
       }
     });
 
   } catch (error) {
     next(error);
+  }
+});
+
+function checkAdminToken(req, res, next) {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken) {
+    const userToken = req.headers['x-admin-token'];
+    if (userToken !== adminToken) {
+      return res.status(401).json({ erro: "Acesso não autorizado. Header X-Admin-Token inválido ou ausente.", codigo: 401 });
+    }
+  }
+  next();
+}
+
+router.delete('/:id', checkAdminToken, async (req, res, next) => {
+  const { id } = req.params;
+  const cidadeId = parseInt(id, 10);
+  if (isNaN(cidadeId)) {
+    return res.status(400).json({ erro: "O ID da cidade deve ser um número inteiro", codigo: 400 });
+  }
+
+  const job = getJobAtual();
+  if (job && job.status === 'rodando' && job.cidadeId === cidadeId) {
+    return res.status(409).json({ erro: "Esta cidade está sendo processada no momento.", codigo: 409 });
+  }
+
+  try {
+    const cityRes = await pool.query("SELECT nome FROM cidade WHERE id = $1", [cidadeId]);
+    if (cityRes.rowCount === 0) {
+      return res.status(404).json({ erro: "Cidade não encontrada", codigo: 404 });
+    }
+    const nome = cityRes.rows[0].nome;
+
+    await pool.query("DELETE FROM cidade WHERE id = $1", [cidadeId]);
+    res.json({ removida: true, nome });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/reprocessar', checkAdminToken, async (req, res, next) => {
+  const { id } = req.params;
+  const cidadeId = parseInt(id, 10);
+  if (isNaN(cidadeId)) {
+    return res.status(400).json({ erro: "O ID da cidade deve ser um número inteiro", codigo: 400 });
+  }
+
+  const job = getJobAtual();
+  if (job && job.status === 'rodando') {
+    return res.status(409).json({ erro: "Já existe um processamento em andamento.", codigo: 409 });
+  }
+
+  try {
+    const cityRes = await pool.query("SELECT * FROM cidade WHERE id = $1", [cidadeId]);
+    if (cityRes.rowCount === 0) {
+      return res.status(404).json({ erro: "Cidade não encontrada", codigo: 404 });
+    }
+    const c = cityRes.rows[0];
+
+    const catRes = await pool.query(`
+      SELECT cat.chave
+      FROM cidade_categoria cc
+      JOIN categoria_servico cat ON cat.id = cc.categoria_id
+      WHERE cc.cidade_id = $1
+    `, [cidadeId]);
+
+    let categorias = catRes.rows.map(r => r.chave);
+    if (categorias.length === 0) {
+      const path = await import('path');
+      const fs = await import('fs');
+      const { fileURLToPath } = await import('url');
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const catalogoPath = path.resolve(__dirname, '../../../db/catalogo_mestre.json');
+      const catalogo = JSON.parse(fs.readFileSync(catalogoPath, 'utf8'));
+      categorias = catalogo.filter(cat => cat.padrao).map(cat => cat.chave);
+    }
+
+    const jobResult = await iniciarJob({
+      osm_tipo: c.osm_limite_tipo,
+      osm_id: c.osm_limite_id ? parseInt(c.osm_limite_id, 10) : null,
+      nome_exibicao: c.osm_limite_id ? c.nome : null,
+      consulta_osm: c.consulta_osm,
+      categorias,
+      atualizar: true
+    });
+
+    res.status(202).json({
+      id: jobResult.id,
+      status: jobResult.status
+    });
+
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({
+      erro: error.message || "Erro ao reprocessar cidade.",
+      codigo: status
+    });
   }
 });
 

@@ -1,5 +1,5 @@
-import { getCidades, getCidadeDetalhe, getMapa, getMoreno } from './api.js';
-import { inicializarMapa, centralizarMapa, limparElementosMapa, toggleIsocrona, toggleHeatmap, limparIsocronas } from './mapa.js';
+import { getCidades, getCidadeDetalhe, getMapa, getMoreno, getGeocodificar, getVitrine, deleteCidade, reprocessarCidade, getAlcancabilidade, getRota } from './api.js';
+import { inicializarMapa, centralizarMapa, limparElementosMapa, toggleIsocrona, toggleHeatmap, limparIsocronas, setDefinindoMarcador, getDefinindoMarcador, carregarMarcadoresCidade, limparMarcadoresPessoais, desenharRotaCasaTrabalho } from './mapa.js';
 import { limparPainelLateral, mostrarToast } from './painel.js';
 
 let cidadeAtualDetalhada = null;
@@ -11,6 +11,9 @@ let activeJobId = null;
 let velocidadeAtual = 3.0;
 let categoriasAtivas = new Set();
 let categoriaHeatmapAtiva = null; // Categoria do heatmap ativa no clique ("Cobertura por serviço")
+
+let noCasaSalvo = null;
+let noTrabalhoSalvo = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializa Mapa
@@ -36,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Limpar tudo
     limparElementosMapa();
     limparIsocronas();
+    limparMarcadoresPessoais();
     if (document.getElementById('heatmap-toggle')) {
       document.getElementById('heatmap-toggle').checked = false;
     }
@@ -43,10 +47,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     limparPainelLateral();
     removerLegendaHeatmap(map);
     
-    if (cidadeId === 0) return;
+    if (cidadeId === 0) {
+      limparMarcadoresPessoais();
+      return;
+    }
     
     try {
       cidadeAtualDetalhada = await getCidadeDetalhe(cidadeId);
+      
+      // Carrega marcadores pessoais
+      carregarMarcadoresCidade(cidadeId);
+      
+      // Reset modo
+      document.getElementById('analise-modo-select').value = 'livre';
+      document.getElementById('caminho-trabalho-info').style.display = 'none';
+      desenharRotaCasaTrabalho(null);
       
       // Inicializa estados dinâmicos (Fase 10)
       velocidadeAtual = parseFloat(cidadeAtualDetalhada.velocidade_kmh);
@@ -181,13 +196,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     exibirDiagnosticoMoreno();
   });
 
-  // 8. Eventos do Modal de Processamento (Fase 08)
+  // 8. Eventos do Modal de Processamento (Fases 12 e 13)
   document.getElementById('modal-close-btn').addEventListener('click', fecharModal);
-  document.getElementById('modal-cancelar-btn').addEventListener('click', fecharModal);
-  document.getElementById('modal-processar-btn').addEventListener('click', submeterNovaCidade);
   document.getElementById('modal-result-close-btn').addEventListener('click', fecharModal);
   document.getElementById('modal-minimizar-btn').addEventListener('click', minimizarModal);
   document.getElementById('badge-processamento-bg').addEventListener('click', reabrirModalBackground);
+
+  document.getElementById('btn-search-geocodificar').addEventListener('click', buscarNominatim);
+  document.getElementById('modal-search-cancelar-btn').addEventListener('click', fecharModal);
+  
+  document.getElementById('btn-vitrine-selecionar-todos').addEventListener('click', () => {
+    document.querySelectorAll('.vitrine-chk').forEach(c => c.checked = true);
+  });
+  document.getElementById('btn-vitrine-limpar-selecao').addEventListener('click', () => {
+    document.querySelectorAll('.vitrine-chk').forEach(c => c.checked = false);
+  });
+  document.getElementById('modal-vitrine-voltar-btn').addEventListener('click', () => {
+    document.getElementById('modal-vitrine-section').style.display = 'none';
+    document.getElementById('modal-search-section').style.display = 'block';
+  });
+  document.getElementById('modal-vitrine-processar-btn').addEventListener('click', processarCidadeVitrine);
+
+  // 9. Eventos de Análise Pessoal (Fase 14)
+  document.getElementById('btn-definir-casa').addEventListener('click', () => {
+    setDefinindoMarcador('casa');
+    mostrarToast("Clique no mapa para posicionar sua casa 🏠");
+  });
+
+  document.getElementById('btn-definir-trabalho').addEventListener('click', () => {
+    setDefinindoMarcador('trabalho');
+    mostrarToast("Clique no mapa para posicionar seu trabalho 💼");
+  });
+
+  document.getElementById('analise-modo-select').addEventListener('change', () => {
+    verificarEAplicarModoPessoal();
+  });
+
+  document.addEventListener('marcadorPessoalAlterado', async (e) => {
+    await verificarEAplicarModoPessoal(true);
+  });
+
+  // 10. Gestão de Cidades (Fase 12.4)
+  document.getElementById('btn-gestao').addEventListener('click', abrirModalGestao);
+  document.getElementById('modal-gestao-close-x').addEventListener('click', fecharModalGestao);
+  document.getElementById('modal-gestao-fechar-btn').addEventListener('click', fecharModalGestao);
 
   // Verifica na inicialização se há um job ativo rodando
   verificarJobAtivoAoCarregar();
@@ -227,12 +279,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (error) {
       selectCidade.innerHTML = '<option value="0">Erro ao carregar cidades</option>';
-      mostrarToast("Nao foi possivel conectar a API para carregar cidades.");
+      mostrarToast("Nao foi possivel conectar a API para carregar as cidades.");
     }
   }
 
   // Renderiza o Cartão de Diagnóstico de Moreno no painel lateral (Fase 09 & 10)
-  async function exibirDiagnosticoMoreno() {
+  async function exibirDiagnosticoMoreno(trabalhoNo = null) {
     const panel = document.getElementById('panel-results');
     if (!panel || !cidadeAtualDetalhada) return;
 
@@ -246,13 +298,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const catList = Array.from(categoriasAtivas).join(',');
-      const moreno = await getMoreno(cidadeAtualDetalhada.id, {
+      const params = {
         velocidade: velocidadeAtual,
         categorias: catList
-      });
+      };
+
+      const modo = document.getElementById('analise-modo-select').value;
+      if (modo === 'completo' && noTrabalhoSalvo) {
+        params.trabalho_no = noTrabalhoSalvo.osm_id;
+        params.incluir_amostra = 1;
+      }
+
+      const moreno = await getMoreno(cidadeAtualDetalhada.id, params);
+      const amostraTrabalhoEspecial = moreno.amostra_trabalho;
 
       const isPersonalizado = (velocidadeAtual !== parseFloat(cidadeAtualDetalhada.velocidade_kmh)) || 
-                              (categoriasAtivas.size !== cidadeAtualDetalhada.indices.filter(i => i.chave !== 'geral').length);
+                              (categoriasAtivas.size !== cidadeAtualDetalhada.indices.filter(i => i.chave !== 'geral').length) ||
+                              (modo === 'completo');
 
       // Cores de status de acordo com a classificação
       let classeCor = 'vermelho';
@@ -270,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="moreno-card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div class="moreno-card-header" style="margin:0;">Diagnóstico de Moreno</div>
-            <button id="btn-como-calculamos" class="btn-secundario" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; display:flex; align-items:center; gap:4px;">
+            <button id="btn-como-calculamos" class="btn-secundario" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; display:flex; align-items:center; gap:4px; cursor:pointer;">
               <span>?</span> Como calculamos?
             </button>
           </div>
@@ -280,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         html += `
           <div style="display:flex; align-items:center; justify-content:space-between; background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:4px; padding:4px 8px; margin-bottom:10px;">
             <span style="font-size:0.75rem; color:#1d4ed8; font-weight:700;">ANÁLISE PERSONALIZADA</span>
-            <button id="btn-restaurar-padrao" class="btn-secundario" style="font-size:0.7rem; padding:1px 6px; background-color:#ffffff;">Restaurar padrao</button>
+            <button id="btn-restaurar-padrao" class="btn-secundario" style="font-size:0.7rem; padding:1px 6px; background-color:#ffffff; cursor:pointer;">Restaurar padrao</button>
           </div>
         `;
       }
@@ -380,14 +442,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isHeatmapAtivo = categoriaHeatmapAtiva === cRes.chave;
         const btnClass = isHeatmapAtivo ? 'active-service-row' : '';
         html += `
-          <div class="service-coverage-row ${btnClass}" data-chave="${cRes.chave}">
+          <div class="service-coverage-row ${btnClass}" data-chave="${cRes.chave}" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:6px; border-radius:4px;">
             <div style="display:flex; align-items:center; gap:6px;">
-              <span class="color-dot" style="background-color: ${cRes.cor_hex};"></span>
+              <span class="color-dot" style="background-color: ${cRes.cor_hex || '#7c3aed'};"></span>
               <span class="service-label">${cRes.rotulo}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
               <span style="font-size:0.8rem; font-weight:600;">${cRes.pct_dentro}%</span>
-              <span class="map-icon" style="cursor:pointer; opacity: ${isHeatmapAtivo ? 1 : 0.4};">🗺️</span>
+              <span class="map-icon" style="opacity: ${isHeatmapAtivo ? 1 : 0.4};">🗺️</span>
             </div>
           </div>
         `;
@@ -405,7 +467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       html += `
-        <button id="moreno-btn-plena" class="btn-primario moreno-btn-plena" style="margin-top:10px;">Ver cobertura plena no mapa</button>
+        <button id="moreno-btn-plena" class="btn-primario moreno-btn-plena" style="margin-top:10px; cursor:pointer;">Ver cobertura plena no mapa</button>
         </div>
       `;
 
@@ -446,7 +508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Listener velocidade
       document.getElementById('moreno-velocidade-select').addEventListener('change', (e) => {
         velocidadeAtual = parseFloat(e.target.value);
-        exibirDiagnosticoMoreno();
+        exibirDiagnosticoMoreno(modo === 'completo' && noTrabalhoSalvo ? noTrabalhoSalvo.osm_id : null);
       });
 
       // Listeners checkboxes de categorias
@@ -462,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             categoriasAtivas.delete(chk.value);
           }
-          exibirDiagnosticoMoreno();
+          exibirDiagnosticoMoreno(modo === 'completo' && noTrabalhoSalvo ? noTrabalhoSalvo.osm_id : null);
         });
       });
 
@@ -472,7 +534,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnRestaurar.addEventListener('click', () => {
           velocidadeAtual = parseFloat(cidadeAtualDetalhada.velocidade_kmh);
           categoriasAtivas = new Set(cidadeAtualDetalhada.indices.map(i => i.chave).filter(k => k !== 'geral'));
-          exibirDiagnosticoMoreno();
+          document.getElementById('analise-modo-select').value = 'livre';
+          verificarEAplicarModoPessoal();
         });
       }
 
@@ -499,32 +562,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('heatmap-toggle').checked = false;
             document.getElementById('heatmap-categoria-select').value = '';
             updateHeatmap();
-            exibirDiagnosticoMoreno(); // Atualiza UI da linha selecionada
+            exibirDiagnosticoMoreno(modo === 'completo' && noTrabalhoSalvo ? noTrabalhoSalvo.osm_id : null);
           } else {
             // Ativa heatmap da categoria clicada
             categoriaHeatmapAtiva = chave;
             document.getElementById('heatmap-toggle').checked = true;
-            document.getElementById('heatmap-categoria-select').value = chave;
-            updateHeatmap();
-            exibirDiagnosticoMoreno();
+            
+            if (chave === 'trabalho_pessoal') {
+              document.getElementById('heatmap-categoria-select').value = '';
+              toggleHeatmap(cidadeAtualDetalhada.id, 'trabalho_pessoal', true, velocidadeAtual, '', amostraTrabalhoEspecial);
+            } else {
+              document.getElementById('heatmap-categoria-select').value = chave;
+              updateHeatmap();
+            }
+            exibirDiagnosticoMoreno(modo === 'completo' && noTrabalhoSalvo ? noTrabalhoSalvo.osm_id : null);
           }
         });
       });
 
     } catch (e) {
       console.error(e);
-      panel.innerHTML = `<p style="color:#ef4444; padding:20px;">Erro ao carregar diagnostico dinamico.</p>`;
+      panel.innerHTML = `<p style="color:#ef4444; padding:20px;">Erro ao calcular diagnostico dinamico.</p>`;
     }
   }
 
   // --- Funções do Modal e Processamento (Fase 08) ---
   
+  // --- Funções do Modal e Processamento (Fase 12, 13 e 14) ---
+  
   function abrirModalNovaCidade() {
     document.getElementById('modal-processamento').style.display = 'flex';
-    document.getElementById('modal-form-section').style.display = 'block';
+    document.getElementById('modal-search-section').style.display = 'block';
+    document.getElementById('modal-vitrine-section').style.display = 'none';
     document.getElementById('modal-progress-section').style.display = 'none';
     document.getElementById('modal-result-section').style.display = 'none';
-    document.getElementById('input-consulta-osm').value = '';
+    document.getElementById('input-search-q').value = '';
+    document.getElementById('search-results-list').innerHTML = '';
   }
 
   function fecharModal() {
@@ -541,52 +614,263 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function reabrirModalBackground() {
     document.getElementById('modal-processamento').style.display = 'flex';
-    document.getElementById('modal-form-section').style.display = 'none';
+    document.getElementById('modal-search-section').style.display = 'none';
+    document.getElementById('modal-vitrine-section').style.display = 'none';
     document.getElementById('modal-progress-section').style.display = 'block';
     document.getElementById('modal-result-section').style.display = 'none';
   }
 
-  async function submeterNovaCidade() {
-    const consulta = document.getElementById('input-consulta-osm').value.trim();
-    if (!consulta) {
-      mostrarToast("Digite o nome da cidade no formato correto.");
+  async function buscarNominatim() {
+    const q = document.getElementById('input-search-q').value.trim();
+    if (q.length < 3) {
+      mostrarToast("Digite pelo menos 3 caracteres.");
       return;
     }
+    const list = document.getElementById('search-results-list');
+    list.innerHTML = '<p style="text-align:center; padding:10px; font-size:0.8rem; color:#64748b;">Buscando no Nominatim...</p>';
+    try {
+      const results = await getGeocodificar(q);
+      list.innerHTML = '';
+      if (results.length === 0) {
+        list.innerHTML = '<p style="text-align:center; padding:10px; font-size:0.8rem; color:#64748b;">Nenhum local encontrado.</p>';
+        return;
+      }
+      results.forEach(res => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '8px';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '4px';
+        div.style.backgroundColor = '#f8fafc';
+        
+        const span = document.createElement('span');
+        span.style.fontSize = '0.75rem';
+        span.style.flex = '1';
+        span.style.marginRight = '8px';
+        span.innerText = res.nome_exibicao;
+        
+        const btn = document.createElement('button');
+        btn.className = 'btn-primario';
+        btn.style.padding = '4px 10px';
+        btn.style.fontSize = '0.75rem';
+        btn.style.cursor = 'pointer';
+        btn.innerText = res.ja_processada ? 'Carregar' : 'Selecionar';
+        
+        btn.addEventListener('click', async () => {
+          if (res.ja_processada) {
+            fecharModal();
+            await carregarCidades();
+            selectCidade.value = res.cidade_id.toString();
+            selectCidade.dispatchEvent(new Event('change'));
+          } else {
+            abrirVitrineCidade(res);
+          }
+        });
+        
+        div.appendChild(span);
+        div.appendChild(btn);
+        list.appendChild(div);
+      });
+    } catch (err) {
+      list.innerHTML = `<p style="text-align:center; color:#ef4444; padding:10px; font-size:0.8rem;">Erro: ${err.message}</p>`;
+    }
+  }
 
+  let localSelecionado = null;
+  async function abrirVitrineCidade(local) {
+    localSelecionado = local;
+    document.getElementById('modal-search-section').style.display = 'none';
+    document.getElementById('modal-vitrine-section').style.display = 'block';
+    document.getElementById('vitrine-cidade-nome').innerText = local.nome_exibicao.split(',')[0];
+    
+    const list = document.getElementById('vitrine-categorias-list');
+    list.innerHTML = '<p style="text-align:center; padding:10px; grid-column:span 2; font-size:0.8rem; color:#64748b;">Consultando Overpass...</p>';
+    
+    try {
+      const items = await getVitrine(local.osm_tipo, local.osm_id);
+      list.innerHTML = '';
+      if (items.length === 0) {
+        list.innerHTML = '<p style="text-align:center; padding:10px; grid-column:span 2; font-size:0.8rem; color:#ef4444;">Nenhum serviço do catálogo mestre encontrado nessa localidade.</p>';
+        return;
+      }
+      items.forEach(item => {
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '6px';
+        label.style.cursor = 'pointer';
+        
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.className = 'vitrine-chk';
+        chk.value = item.chave;
+        chk.checked = item.padrao && item.quantidade > 0;
+        
+        const dot = document.createElement('span');
+        dot.style.backgroundColor = item.cor;
+        dot.style.width = '8px';
+        dot.style.height = '8px';
+        dot.style.borderRadius = '50%';
+        dot.style.display = 'inline-block';
+        
+        const text = document.createElement('span');
+        text.innerHTML = `${item.rotulo.split(' ')[0]} <span style="color:#64748b; font-size:0.7rem;">(${item.quantidade})</span>`;
+        
+        label.appendChild(chk);
+        label.appendChild(dot);
+        label.appendChild(text);
+        list.appendChild(label);
+      });
+    } catch (err) {
+      list.innerHTML = `<p style="text-align:center; color:#ef4444; padding:10px; grid-column:span 2; font-size:0.8rem;">Erro ao carregar vitrine: ${err.message}</p>`;
+    }
+  }
+
+  async function processarCidadeVitrine() {
+    const checkedChks = document.querySelectorAll('.vitrine-chk:checked');
+    if (checkedChks.length === 0) {
+      mostrarToast("Selecione pelo menos um serviço para processar.");
+      return;
+    }
+    const categorias = Array.from(checkedChks).map(c => c.value);
+    
     try {
       const res = await fetch('/api/v1/processamentos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consulta_osm: consulta })
+        body: JSON.stringify({
+          osm_tipo: localSelecionado.osm_tipo,
+          osm_id: localSelecionado.osm_id,
+          nome_exibicao: localSelecionado.nome_exibicao,
+          categorias
+        })
       });
-      
       const data = await res.json();
-      
-      if (res.status === 200 && data.ja_processada) {
-        mostrarToast("Cidade ja processada! Carregando...");
-        fecharModal();
-        await carregarCidades();
-        selectCidade.value = data.cidade_id.toString();
-        selectCidade.dispatchEvent(new Event('change'));
-        return;
-      }
-      
       if (res.status === 202) {
-        iniciarAcompanhamentoJob(data.id, consulta);
-        return;
-      }
-      
-      if (res.status === 409) {
+        iniciarAcompanhamentoJob(data.id, localSelecionado.nome_exibicao);
+      } else if (res.status === 409) {
         mostrarToast("Processamento concorrente detectado!");
         iniciarAcompanhamentoJob(data.job.id, data.job.consulta_osm);
+      } else {
+        mostrarToast(data.erro || "Falha ao iniciar processamento.");
+      }
+    } catch (err) {
+      mostrarToast("Erro de conexão ao processar cidade.");
+    }
+  }
+
+  // --- Gestão de Cidades (Fase 12.4) ---
+  
+  function abrirModalGestao() {
+    const tokenStr = localStorage.getItem('gestao_admin_token') || '';
+    document.getElementById('gestao-admin-token').value = tokenStr;
+    document.getElementById('gestao-token-container').style.display = 'block';
+    
+    document.getElementById('modal-gestao').style.display = 'flex';
+    carregarCidadesGestao();
+  }
+
+  function fecharModalGestao() {
+    const tokenStr = document.getElementById('gestao-admin-token').value.trim();
+    localStorage.setItem('gestao_admin_token', tokenStr);
+    document.getElementById('modal-gestao').style.display = 'none';
+  }
+
+  async function carregarCidadesGestao() {
+    const list = document.getElementById('gestao-cidades-lista');
+    list.innerHTML = '<p style="text-align:center; padding:10px;">Carregando cidades...</p>';
+    try {
+      const cidades = await getCidades();
+      list.innerHTML = '';
+      if (cidades.length === 0) {
+        list.innerHTML = '<p style="text-align:center; padding:10px;">Nenhuma cidade processada.</p>';
         return;
       }
+      cidades.forEach(c => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '8px';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '4px';
+        div.style.backgroundColor = '#f8fafc';
 
-      // Erros 400
-      mostrarToast(data.erro || "Falha ao iniciar processamento.");
+        const info = document.createElement('div');
+        info.style.flex = '1';
+        info.innerHTML = `<strong>${c.nome}</strong> <span style="font-size:0.7rem; color:#64748b;">(${c.pais})</span>`;
 
+        const btns = document.createElement('div');
+        btns.style.display = 'flex';
+        btns.style.gap = '6px';
+
+        const btnReprocessar = document.createElement('button');
+        btnReprocessar.className = 'btn-secundario';
+        btnReprocessar.style.padding = '4px 8px';
+        btnReprocessar.style.fontSize = '0.75rem';
+        btnReprocessar.style.cursor = 'pointer';
+        btnReprocessar.innerText = 'Reprocessar';
+        btnReprocessar.addEventListener('click', () => reprocessarCidadeClick(c));
+
+        const btnExcluir = document.createElement('button');
+        btnExcluir.className = 'btn-secundario';
+        btnExcluir.style.padding = '4px 8px';
+        btnExcluir.style.fontSize = '0.75rem';
+        btnExcluir.style.cursor = 'pointer';
+        btnExcluir.style.color = '#ef4444';
+        btnExcluir.style.borderColor = '#fee2e2';
+        btnExcluir.innerText = 'Excluir';
+        btnExcluir.addEventListener('click', () => excluirCidadeClick(c));
+
+        btns.appendChild(btnReprocessar);
+        btns.appendChild(btnExcluir);
+        div.appendChild(info);
+        div.appendChild(btns);
+        list.appendChild(div);
+      });
     } catch (err) {
-      mostrarToast("Nao foi possivel conectar ao servidor.");
+      list.innerHTML = `<p style="text-align:center; color:#ef4444; padding:10px;">Erro ao carregar cidades.</p>`;
+    }
+  }
+
+  async function reprocessarCidadeClick(cidade) {
+    if (!confirm(`Deseja reprocessar a cidade ${cidade.nome}? Isso atualizará os dados do OSM ignorando o cache.`)) {
+      return;
+    }
+    const token = document.getElementById('gestao-admin-token').value.trim();
+    try {
+      const data = await reprocessarCidade(cidade.id, token);
+      fecharModalGestao();
+      document.getElementById('modal-processamento').style.display = 'flex';
+      iniciarAcompanhamentoJob(data.id, cidade.nome);
+    } catch (err) {
+      mostrarToast(`Erro ao reprocessar cidade: ${err.message}`);
+    }
+  }
+
+  async function excluirCidadeClick(cidade) {
+    if (!confirm(`ATENÇÃO: Deseja realmente excluir permanentemente a cidade ${cidade.nome}? Todos os dados de serviços e nós serão deletados.`)) {
+      return;
+    }
+    const token = document.getElementById('gestao-admin-token').value.trim();
+    try {
+      await deleteCidade(cidade.id, token);
+      mostrarToast(`Cidade ${cidade.nome} excluída com sucesso.`);
+      
+      if (cidadeAtualDetalhada && cidadeAtualDetalhada.id === cidade.id) {
+        cidadeAtualDetalhada = null;
+        limparElementosMapa();
+        limparIsocronas();
+        limparPainelLateral();
+        selectCidade.value = '0';
+      }
+      
+      await carregarCidades();
+      await carregarCidadesGestao();
+    } catch (err) {
+      mostrarToast(`Erro ao excluir cidade: ${err.message}`);
     }
   }
 
@@ -594,7 +878,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeJobId = jobId;
     
     // Altera o modal para modo progresso
-    document.getElementById('modal-form-section').style.display = 'none';
+    document.getElementById('modal-search-section').style.display = 'none';
+    document.getElementById('modal-vitrine-section').style.display = 'none';
     document.getElementById('modal-progress-section').style.display = 'block';
     document.getElementById('modal-result-section').style.display = 'none';
     
@@ -602,7 +887,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modal-progress-bar').style.width = "5%";
     document.getElementById('progress-pct-text').innerText = "5%";
     
-    // Garante que o badge esteja oculto ou ativo conforme minimização
     document.getElementById('badge-text-msg').innerText = `Processando: ${consulta.split(',')[0]} (5%)`;
 
     if (pollingIntervalId) clearInterval(pollingIntervalId);
@@ -687,6 +971,69 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (e) {
       // Ignora erro de rede no boot
+    }
+  }
+
+  async function verificarEAplicarModoPessoal(forcarAtualizacao = false) {
+    const cidadeId = parseInt(selectCidade.value, 10);
+    if (isNaN(cidadeId) || cidadeId === 0) return;
+
+    const modo = document.getElementById('analise-modo-select').value;
+    const infoRota = document.getElementById('caminho-trabalho-info');
+
+    if (modo === 'livre') {
+      infoRota.style.display = 'none';
+      desenharRotaCasaTrabalho(null);
+      await exibirDiagnosticoMoreno();
+      return;
+    }
+
+    const casaStr = localStorage.getItem(`cidade_${cidadeId}_casa`);
+    const trabalhoStr = localStorage.getItem(`cidade_${cidadeId}_trabalho`);
+
+    if (!casaStr || !trabalhoStr) {
+      document.getElementById('analise-modo-select').value = 'livre';
+      infoRota.style.display = 'none';
+      desenharRotaCasaTrabalho(null);
+      if (!forcarAtualizacao) {
+        mostrarToast("Defina sua casa 🏠 e seu trabalho 💼 antes de usar o modo pessoal.");
+      }
+      return;
+    }
+
+    const casa = JSON.parse(casaStr);
+    const trabalho = JSON.parse(trabalhoStr);
+
+    try {
+      const dataCasa = await getAlcancabilidade(cidadeId, casa.lat, casa.lon);
+      const dataTrabalho = await getAlcancabilidade(cidadeId, trabalho.lat, trabalho.lon);
+      
+      noCasaSalvo = dataCasa.no;
+      noTrabalhoSalvo = dataTrabalho.no;
+
+      if (!noCasaSalvo || !noTrabalhoSalvo) {
+        throw new Error("Não foi possível mapear casa ou trabalho aos nós da rede viária.");
+      }
+
+      try {
+        const rota = await getRota(cidadeId, noCasaSalvo.osm_id, noTrabalhoSalvo.osm_id, velocidadeAtual);
+        desenharRotaCasaTrabalho(rota.geojson);
+        infoRota.style.display = 'block';
+        document.getElementById('caminho-trabalho-tempo').innerText = rota.tempo_min.toFixed(1);
+      } catch (err) {
+        console.warn("Sem rota entre casa e trabalho:", err);
+        infoRota.style.display = 'block';
+        document.getElementById('caminho-trabalho-tempo').innerText = "Inalcançável";
+        desenharRotaCasaTrabalho(null);
+      }
+
+      await exibirDiagnosticoMoreno(noTrabalhoSalvo.osm_id);
+
+    } catch (err) {
+      mostrarToast(err.message || "Erro ao processar análise do modo pessoal.");
+      document.getElementById('analise-modo-select').value = 'livre';
+      infoRota.style.display = 'none';
+      desenharRotaCasaTrabalho(null);
     }
   }
 

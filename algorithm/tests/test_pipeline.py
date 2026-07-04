@@ -116,9 +116,10 @@ def test_pipeline_completo():
             'alcancabilidade_por_no': alcancabilidade_por_no,
             'isocronas': isocronas,
             'agregados': agregados,
-            'moreno': moreno_res
+            'moreno': moreno_res,
+            'categorias_processadas': [cat['id'] for cat in categorias]
         }
-        
+
         cidade_id = gravar_cidade(conn, cfg, G, resultados)
         assert cidade_id is not None
         
@@ -148,6 +149,10 @@ def test_pipeline_completo():
             row = cur.fetchone()
             assert row is not None
             assert 0 <= float(row[0]) <= 100
+
+            # cidade_categoria registra TODAS as categorias processadas (fase 13)
+            cur.execute("SELECT count(*) FROM cidade_categoria WHERE cidade_id = %s", (cidade_id,))
+            assert cur.fetchone()[0] == len(resultados['categorias_processadas'])
             
         # Reprocessar a mesma cidade nao duplica linhas (upsert ok)
         cidade_id_2 = gravar_cidade(conn, cfg, G, resultados)

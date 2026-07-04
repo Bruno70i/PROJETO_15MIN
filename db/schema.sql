@@ -17,7 +17,18 @@ CREATE TABLE IF NOT EXISTS cidade (
     tempo_execucao_s NUMERIC(10,2),
     velocidade_kmh  NUMERIC(4,2) NOT NULL DEFAULT 3.0,
     limiar_minutos  INTEGER NOT NULL DEFAULT 15,
-    UNIQUE (consulta_osm)
+    UNIQUE (consulta_osm),
+    osm_limite_tipo TEXT,
+    osm_limite_id  BIGINT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cidade_osm_limite
+  ON cidade (osm_limite_tipo, osm_limite_id)
+  WHERE osm_limite_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS cidade_categoria (
+    cidade_id    INTEGER NOT NULL REFERENCES cidade(id) ON DELETE CASCADE,
+    categoria_id INTEGER NOT NULL REFERENCES categoria_servico(id),
+    PRIMARY KEY (cidade_id, categoria_id)
 );
 
 CREATE TABLE IF NOT EXISTS categoria_servico (

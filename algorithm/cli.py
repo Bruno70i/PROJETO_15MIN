@@ -16,21 +16,33 @@ def _progresso(pct: int, etapa: str, msg: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Plataforma de Alcançabilidade Urbana - Cidade de 15 Minutos")
-    parser.add_argument("--place", required=True, help="Nome do local no OpenStreetMap")
+    parser.add_argument("--place", required=False, help="Nome do local no OpenStreetMap")
+    parser.add_argument("--osm-tipo", choices=["relation", "way"], help="Tipo de limite canônico OSM")
+    parser.add_argument("--osm-id", type=int, help="ID de limite canônico OSM")
+    parser.add_argument("--nome", help="Nome de exibição canônico da cidade")
+    parser.add_argument("--atualizar", action="store_true", help="Ignora os caches e rebaixa dados do OSM")
+    parser.add_argument("--categorias", help="Chaves de categorias a processar separadas por vírgula")
     parser.add_argument("--velocidade", type=float, default=3.0, help="Velocidade de caminhada (km/h)")
     parser.add_argument("--limiar", type=int, default=15, help="Limiar de alcançabilidade (minutos)")
     parser.add_argument("--sem-cache", action="store_true", help="Força download do grafo sem usar o cache")
     
     args = parser.parse_args()
     
-    print(f"Iniciando processamento para: {args.place}")
+    if not args.place and not (args.osm_tipo and args.osm_id):
+        parser.error("Defina --place OU ambos --osm-tipo e --osm-id")
+        
+    print(f"Iniciando processamento para: {args.nome or args.place}")
     t_start = time.time()
     
     cfg = Configuracao(
         consulta_osm=args.place,
+        osm_tipo=args.osm_tipo,
+        osm_id=args.osm_id,
+        nome_cidade=args.nome,
         velocidade_kmh=args.velocidade,
         limiar_minutos=args.limiar,
-        usar_cache_grafo=not args.sem_cache
+        usar_cache_grafo=not args.sem_cache,
+        atualizar=args.atualizar
     )
     
     try:
@@ -39,7 +51,8 @@ def main():
         conn = conectar_db()
         
         # Carrega categorias do banco
-        categorias = carregar_categorias(conn)
+        chaves_list = args.categorias.split(",") if args.categorias else None
+        categorias = carregar_categorias(conn, chaves=chaves_list)
         print(f"Carregadas {len(categorias)} categorias de servico do banco de dados.")
         
         # 1. Carrega ou baixa grafo
@@ -132,7 +145,9 @@ def main():
             'alcancabilidade_por_no': alcancabilidade_por_no,
             'isocronas': isocronas,
             'agregados': agregados,
-            'moreno': moreno_res
+            'moreno': moreno_res,
+            # categorias PROCESSADAS (mesmo sem servicos) — vao para cidade_categoria
+            'categorias_processadas': [cat['id'] for cat in categorias]
         }
         
         t_calc_total = time.time() - t_start
@@ -147,7 +162,7 @@ def main():
         print("\n" + "="*50)
         print("RESUMO DO PROCESSAMENTO")
         print("="*50)
-        print(f"Local: {cfg.consulta_osm}")
+        print(f"Local: {cfg.consulta_osm or cfg.nome_cidade}")
         print(f"Nos processados: {len(G.nodes):,}")
         print(f"Arestas processadas: {len(G.edges):,}")
         print(f"Tempo total (calculo): {t_calc_total:.1f}s ({t_calc_total/60:.1f} min)")

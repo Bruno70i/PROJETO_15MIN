@@ -179,4 +179,62 @@ describe('API Integration Tests', () => {
     const invalidVel = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?velocidade=99`);
     expect(invalidVel.status).toBe(400);
   });
+
+  // Novos Testes das Fases 12, 13 e 14
+  it('GET /api/v1/geocodificar?q=Praia Grande -> 200 com >= 1 candidato valido (exige rede)', async () => {
+    const res = await request(app).get('/api/v1/geocodificar?q=Praia Grande');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    // Praia Grande (SP) certamente geocodifica: lista vazia = regressao
+    // (ex.: bug do campo 'category' do format=jsonv2 do Nominatim).
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    expect(res.body[0]).toHaveProperty('osm_tipo');
+    expect(typeof res.body[0].osm_id).toBe('number');
+    expect(res.body[0]).toHaveProperty('nome_exibicao');
+    expect(res.body[0]).toHaveProperty('ja_processada');
+  }, 20000);
+
+  it('GET /api/v1/geocodificar com consulta inválida -> 400', async () => {
+    const res = await request(app).get('/api/v1/geocodificar?q=ab');
+    expect(res.status).toBe(400);
+  });
+
+  it('GET /api/v1/vitrine com parâmetros inválidos -> 400', async () => {
+    const res = await request(app).get('/api/v1/vitrine?osm_tipo=node&osm_id=123');
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/v1/processamentos com categorias inválidas -> 400', async () => {
+    const res = await request(app).post('/api/v1/processamentos').send({
+      osm_tipo: 'relation',
+      osm_id: 298285,
+      nome_exibicao: 'São Paulo',
+      categorias: ['chave_inexistente']
+    });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('erro');
+  });
+
+  it('DELETE /api/v1/cidades/999999 -> 404', async () => {
+    const res = await request(app).delete('/api/v1/cidades/999999');
+    expect(res.status).toBe(404);
+  });
+
+  it('POST /api/v1/cidades/999999/reprocessar -> 404', async () => {
+    const res = await request(app).post('/api/v1/cidades/999999/reprocessar');
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/v1/cidades/:id/moreno com trabalho_no válido e inválido', async () => {
+    const { rows } = await pool.query("SELECT osm_id FROM no WHERE cidade_id = $1 LIMIT 1", [cidadeTestId]);
+    if (rows.length > 0) {
+      const validNode = rows[0].osm_id;
+      const res = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?trabalho_no=${validNode}`);
+      expect(res.status).toBe(200);
+      expect(res.body.parametros.trabalho_no).toBe(String(validNode));
+    }
+
+    const resInvalid = await request(app).get(`/api/v1/cidades/${cidadeTestId}/moreno?trabalho_no=9999999999`);
+    expect(resInvalid.status).toBe(400);
+  });
 });

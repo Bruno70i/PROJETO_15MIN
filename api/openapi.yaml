@@ -25,6 +25,115 @@ paths:
                   banco:
                     type: boolean
                     example: true
+  /geocodificar:
+    get:
+      summary: Busca cidades canônicas no Nominatim
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Termo de busca (3 a 120 caracteres)
+          example: "Praia Grande"
+      responses:
+        '200':
+          description: Resultados encontrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    osm_tipo:
+                      type: string
+                      example: "relation"
+                    osm_id:
+                      type: integer
+                      example: 298316
+                    nome_exibicao:
+                      type: string
+                      example: "Praia Grande, São Paulo, Brasil"
+                    tipo:
+                      type: string
+                      example: "administrative"
+                    ja_processada:
+                      type: boolean
+                      example: true
+                    cidade_id:
+                      type: integer
+                      nullable: true
+                      example: 22
+        '400':
+          description: Termo de busca inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '502':
+          description: Falha de comunicação com o Nominatim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /vitrine:
+    get:
+      summary: Consulta a existência de serviços no Overpass (Vitrine)
+      parameters:
+        - name: osm_tipo
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [relation, way]
+          example: "relation"
+        - name: osm_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          example: 298285
+      responses:
+        '200':
+          description: Lista de serviços com as quantidades encontradas no município
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    chave:
+                      type: string
+                      example: "saude"
+                    rotulo:
+                      type: string
+                      example: "Saúde (hospitais)"
+                    grupo:
+                      type: string
+                      example: "Saúde"
+                    cor:
+                      type: string
+                      example: "#e74c3c"
+                    padrao:
+                      type: boolean
+                      example: true
+                    quantidade:
+                      type: integer
+                      example: 12
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '503':
+          description: Serviço do OpenStreetMap indisponível ou sobrecarregado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /cidades:
     get:
       summary: Lista cidades processadas
@@ -59,6 +168,98 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
+    delete:
+      summary: Remove uma cidade do sistema (cascade delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Token
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Token administrativo (obrigatório se ADMIN_TOKEN estiver configurado)
+      responses:
+        '200':
+          description: Cidade removida com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removida:
+                    type: boolean
+                    example: true
+                  nome:
+                    type: string
+                    example: "Praia Grande"
+        '401':
+          description: Token administrativo inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Cidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '409':
+          description: Cidade está sendo processada no momento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /cidades/{id}/reprocessar:
+    post:
+      summary: Dispara o reprocessamento de uma cidade existente (Fase 12)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Token
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Token administrativo (obrigatório se ADMIN_TOKEN estiver configurado)
+      responses:
+        '202':
+          description: Reprocessamento iniciado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    example: "rodando"
+        '401':
+          description: Token administrativo inválido ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Cidade não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '409':
+          description: Já existe um processamento em andamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /cidades/{id}/moreno:
     get:
       summary: Diagnóstico Moreno Dinâmico da cidade (Fase 10)
@@ -82,6 +283,13 @@ paths:
             minimum: 2.0
             maximum: 6.0
             example: 4.5
+        - name: trabalho_no
+          in: query
+          required: false
+          schema:
+            type: string
+            description: osm_id do nó do trabalho (inteiro em string)
+            example: "1800922841"
       responses:
         '200':
           description: Diagnóstico Moreno recalculado dinamicamente
@@ -419,8 +627,21 @@ paths:
                 consulta_osm:
                   type: string
                   example: "Santos, São Paulo, Brazil"
-              required:
-                - consulta_osm
+                osm_tipo:
+                  type: string
+                  enum: [relation, way]
+                  example: "relation"
+                osm_id:
+                  type: integer
+                  example: 298285
+                nome_exibicao:
+                  type: string
+                  example: "Santos"
+                categorias:
+                  type: array
+                  items:
+                    type: string
+                  example: ["saude", "educacao"]
       responses:
         '202':
           description: Processamento iniciado

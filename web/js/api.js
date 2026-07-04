@@ -66,6 +66,40 @@ export async function getMoreno(cidadeId, params = {}) {
   const query = new URLSearchParams();
   if (params.categorias) query.append('categorias', params.categorias);
   if (params.velocidade) query.append('velocidade', params.velocidade);
+  if (params.trabalho_no) query.append('trabalho_no', params.trabalho_no);
+  if (params.incluir_amostra !== undefined) query.append('incluir_amostra', params.incluir_amostra);
   const qStr = query.toString();
   return request(`${API_BASE}/cidades/${cidadeId}/moreno${qStr ? '?' + qStr : ''}`);
+}
+
+export async function getGeocodificar(q) {
+  return request(`${API_BASE}/geocodificar?q=${encodeURIComponent(q)}`);
+}
+
+export async function getVitrine(osm_tipo, osm_id) {
+  return request(`${API_BASE}/vitrine?osm_tipo=${osm_tipo}&osm_id=${osm_id}`);
+}
+
+export async function deleteCidade(id, token = '') {
+  const headers = {};
+  if (token) headers['x-admin-token'] = token;
+  const res = await fetch(`${API_BASE}/cidades/${id}`, {
+    method: 'DELETE',
+    headers
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.erro || `Erro HTTP ${res.status}`);
+  return data;
+}
+
+export async function reprocessarCidade(id, token = '') {
+  const headers = {};
+  if (token) headers['x-admin-token'] = token;
+  const res = await fetch(`${API_BASE}/cidades/${id}/reprocessar`, {
+    method: 'POST',
+    headers
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.erro || `Erro HTTP ${res.status}`);
+  return data;
 }

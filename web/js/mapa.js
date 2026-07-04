@@ -8,6 +8,11 @@ let linhaCaminho = null;
 let camadaIsocronas = {};
 let camadaHeatmap = null;
 
+let marcadorCasa = null;
+let marcadorTrabalho = null;
+let linhaCasaTrabalho = null;
+let definindoMarcador = null; // 'casa' | 'trabalho' | null
+
 export function inicializarMapa() {
   // Inicializa o mapa centralizado no Brasil por padrão
   mapa = L.map('map').setView([-15.77972, -47.92972], 4);
@@ -29,7 +34,116 @@ export function centralizarMapa(lat, lon, zoom = 13) {
   }
 }
 
+export function setDefinindoMarcador(tipo) {
+  definindoMarcador = tipo;
+  if (tipo) {
+    document.getElementById('map').style.cursor = 'crosshair';
+  } else {
+    document.getElementById('map').style.cursor = '';
+  }
+}
+
+export function getDefinindoMarcador() {
+  return definindoMarcador;
+}
+
+async function salvarMarcadorPessoal(tipo, lat, lon) {
+  const cidadeSelect = document.getElementById('cidade-select');
+  const cidadeId = parseInt(cidadeSelect.value, 10);
+  if (isNaN(cidadeId) || cidadeId === 0) return;
+
+  localStorage.setItem(`cidade_${cidadeId}_${tipo}`, JSON.stringify({ lat, lon }));
+  desenharMarcador(tipo, lat, lon);
+
+  // Dispara evento para recalcular rotas/diagnóstico
+  document.dispatchEvent(new CustomEvent('marcadorPessoalAlterado', { detail: { tipo, lat, lon } }));
+}
+
+function desenharMarcador(tipo, lat, lon) {
+  if (tipo === 'casa') {
+    if (marcadorCasa) mapa.removeLayer(marcadorCasa);
+    const iconCasa = L.divIcon({
+      html: '<div style="font-size: 26px; text-shadow: 0 0 4px #fff; cursor: grab;">🏠</div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+    marcadorCasa = L.marker([lat, lon], { icon: iconCasa, draggable: true }).addTo(mapa);
+    marcadorCasa.on('dragend', (e) => {
+      const pos = e.target.getLatLng();
+      salvarMarcadorPessoal('casa', pos.lat, pos.lng);
+    });
+  } else {
+    if (marcadorTrabalho) mapa.removeLayer(marcadorTrabalho);
+    const iconTrabalho = L.divIcon({
+      html: '<div style="font-size: 26px; text-shadow: 0 0 4px #fff; cursor: grab;">💼</div>',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+    marcadorTrabalho = L.marker([lat, lon], { icon: iconTrabalho, draggable: true }).addTo(mapa);
+    marcadorTrabalho.on('dragend', (e) => {
+      const pos = e.target.getLatLng();
+      salvarMarcadorPessoal('trabalho', pos.lat, pos.lng);
+    });
+  }
+}
+
+export function carregarMarcadoresCidade(cidadeId) {
+  limparMarcadoresPessoais();
+  
+  const casaStr = localStorage.getItem(`cidade_${cidadeId}_casa`);
+  if (casaStr) {
+    const casa = JSON.parse(casaStr);
+    desenharMarcador('casa', casa.lat, casa.lon);
+  }
+
+  const trabalhoStr = localStorage.getItem(`cidade_${cidadeId}_trabalho`);
+  if (trabalhoStr) {
+    const trabalho = JSON.parse(trabalhoStr);
+    desenharMarcador('trabalho', trabalho.lat, trabalho.lon);
+  }
+}
+
+export function limparMarcadoresPessoais() {
+  if (marcadorCasa) {
+    mapa.removeLayer(marcadorCasa);
+    marcadorCasa = null;
+  }
+  if (marcadorTrabalho) {
+    mapa.removeLayer(marcadorTrabalho);
+    marcadorTrabalho = null;
+  }
+  if (linhaCasaTrabalho) {
+    mapa.removeLayer(linhaCasaTrabalho);
+    linhaCasaTrabalho = null;
+  }
+}
+
+export function desenharRotaCasaTrabalho(geojson) {
+  if (linhaCasaTrabalho) {
+    mapa.removeLayer(linhaCasaTrabalho);
+    linhaCasaTrabalho = null;
+  }
+  if (!geojson) return;
+  
+  const casing = L.geoJSON(geojson, {
+    style: { color: '#ffffff', weight: 8, opacity: 0.9 }
+  });
+  const linha = L.geoJSON(geojson, {
+    style: { color: '#7c3aed', weight: 4, opacity: 1, dashArray: '5, 8' }
+  });
+
+  linhaCasaTrabalho = L.featureGroup([casing, linha]).addTo(mapa);
+}
+
 async function onMapaClick(e) {
+  if (definindoMarcador) {
+    const { lat, lng } = e.latlng;
+    const tipo = definindoMarcador;
+    setDefinindoMarcador(null);
+    await salvarMarcadorPessoal(tipo, lat, lng);
+    return;
+  }
+
   const cidadeSelect = document.getElementById('cidade-select');
   const cidadeId = parseInt(cidadeSelect.value, 10);
   
@@ -202,7 +316,7 @@ export function limparIsocronas() {
 }
 
 // Mostra o mapa de calor/camada de nós
-export async function toggleHeatmap(cidadeId, categoria, ativo, velocidade = '', categorias = '') {
+export async function toggleHeatmap(cidadeId, categoria, ativo, velocidade = '', categorias = '', amostraEspecial = null) {
   if (camadaHeatmap) {
     mapa.removeLayer(camadaHeatmap);
     camadaHeatmap = null;
@@ -211,7 +325,7 @@ export async function toggleHeatmap(cidadeId, categoria, ativo, velocidade = '',
   if (!ativo) return;
   
   try {
-    const pontos = await getMapa(cidadeId, categoria, 3000, velocidade, categorias);
+    const pontos = amostraEspecial ? amostraEspecial : await getMapa(cidadeId, categoria, 3000, velocidade, categorias);
     
     // Escala de cores dos nós do heatmap
     // ≤5 min #1a9850, ≤10 #91cf60, ≤15 #d9ef8b, ≤25 #fee08b, >25 #d73027, null #999

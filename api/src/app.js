@@ -15,6 +15,8 @@ import isocronasRouter from './routes/isocronas.js';
 import alcancabilidadeRouter from './routes/alcancabilidade.js';
 import rotaRouter from './routes/rota.js';
 import processamentosRouter from './routes/processamentos.js';
+import geocodificarRouter from './routes/geocodificar.js';
+import vitrineRouter from './routes/vitrine.js';
 
 const app = express();
 
@@ -179,6 +181,8 @@ app.use('/api/v1/cidades', isocronasRouter); // Rota /cidades/:id/isocronas estÃ
 app.use('/api/v1/alcancabilidade', alcancabilidadeRouter);
 app.use('/api/v1/rota', rotaRouter);
 app.use('/api/v1/processamentos', processamentosRouter);
+app.use('/api/v1/geocodificar', geocodificarRouter);
+app.use('/api/v1/vitrine', vitrineRouter);
 
 // Handler 404
 app.use((req, res, next) => {

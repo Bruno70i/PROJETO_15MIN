@@ -24,7 +24,14 @@ def localizar_servicos(G: nx.MultiDiGraph, cfg, categorias: list) -> dict[int, l
             
         resultados[cat_id] = []
         try:
-            places = ox.features_from_place(cfg.consulta_osm, tag)
+            if cfg.osm_tipo and cfg.osm_id:
+                codigo = ("R" if cfg.osm_tipo == "relation" else "W") + str(cfg.osm_id)
+                gdf = ox.geocode_to_gdf(codigo, by_osmid=True)
+                poligono = gdf.geometry.iloc[0]
+                places = ox.features_from_polygon(poligono, tag)
+            else:
+                places = ox.features_from_place(cfg.consulta_osm, tag)
+                
             if places.empty:
                 print(f"[AVISO] Nenhuma feicao encontrada para '{cat['rotulo']}'")
                 continue

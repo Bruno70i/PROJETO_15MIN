@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,33 +13,34 @@
       padding: 30px;
       background-color: #ffffff;
       border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
       line-height: 1.6;
     }
-    
-    .about-container h2, .about-container h3 {
+
+    .about-container h2,
+    .about-container h3 {
       color: var(--primary-color);
       margin-bottom: 15px;
       margin-top: 25px;
     }
-    
+
     .about-container h2:first-of-type {
       margin-top: 0;
     }
-    
+
     .about-container p {
       margin-bottom: 15px;
       font-size: 0.95rem;
       color: #334155;
     }
-    
+
     .about-container ul {
       margin-left: 20px;
       margin-bottom: 20px;
       font-size: 0.95rem;
       color: #334155;
     }
-    
+
     .team-card {
       background-color: #f8fafc;
       border: 1px solid var(--border-color);
@@ -46,7 +48,7 @@
       padding: 15px;
       margin-top: 20px;
     }
-    
+
     .api-link-box {
       background-color: #f0fdf4;
       border: 1px solid #bbf7d0;
@@ -57,13 +59,14 @@
       text-align: center;
       font-weight: 600;
     }
-    
+
     .api-link-box a {
       color: #15803d;
       text-decoration: underline;
     }
   </style>
 </head>
+
 <body>
 
   <!-- Barra Superior -->
@@ -71,7 +74,7 @@
     <div class="brand">
       <h1>Cidade de 15 Minutos</h1>
     </div>
-    
+
     <div class="controls">
       <nav class="nav-links" aria-label="Navegação Principal">
         <a href="index.html">Mapa</a>
@@ -86,38 +89,57 @@
   <main class="about-container">
     <h2>Sobre o Projeto</h2>
     <p>
-      Este sistema é a implementação computacional do conceito de **"Cidade de 15 Minutos"**, proposto originalmente por Carlos Moreno. O conceito defende um planejamento urbano policêntrico, no qual os cidadãos devem conseguir acessar todos os serviços essenciais à vida (saúde, educação, comércio, lazer, combustível e transporte) em no máximo 15 minutos de caminhada a partir de suas residências.
+      Este sistema é a implementação computacional do conceito de **"Cidade de 15 Minutos"**, proposto originalmente por
+      Carlos Moreno. O conceito defende um planejamento urbano policêntrico, no qual os cidadãos devem conseguir acessar
+      todos os serviços essenciais à vida (moradia, trabalho, comércio, saúde, educação, lazer) em no máximo 15 minutos
+      de caminhada a partir de suas residências.
     </p>
     <p>
-      O projeto faz parte do Trabalho de Conclusão de Curso intitulado **"Mensuração Computacional de Alcançabilidade Urbana: Cidade de 15 Minutos"** (UNIP, 2026), desenvolvido pelos alunos Bruno Nascimento, Guilherme Rocha e Pedro Henrique de Jesus. O objetivo é fornecer uma ferramenta analítica open-source para auxiliar gestores urbanos e a comunidade acadêmica a identificar vazios de infraestrutura urbana.
+      O projeto faz parte do Trabalho de Conclusão de Curso intitulado **"Mensuração Computacional de Alcançabilidade
+      Urbana: Cidade de 15 Minutos"** (UNIP, 2026), desenvolvido pelos alunos Bruno Nascimento, Guilherme Rocha e Pedro
+      Henrique de Jesus. O objetivo é fornecer uma ferramenta analítica open-source para auxiliar gestores urbanos e a
+      comunidade acadêmica a identificar vazios de infraestrutura urbana.
     </p>
-    
+
     <h3>Metodologia de Cálculo</h3>
     <p>
-      O cálculo do índice de alcançabilidade individual por ponto e dos agregados municipais é realizado de forma robusta e otimizada:
+      O cálculo do índice de alcançabilidade individual por ponto e dos agregados municipais é realizado de forma
+      robusta e otimizada:
     </p>
     <ul>
-      <li>Os tempos de acesso são mensurados sobre a **malha viária real do OpenStreetMap (OSM)**, considerando vias transitáveis de pedestres;</li>
+      <li>Os tempos de acesso são mensurados sobre a **malha viária real do OpenStreetMap (OSM)**, considerando vias
+        transitáveis de pedestres;</li>
       <li>Adota-se uma velocidade média de caminhada conservadora de **3,0 km/h**;</li>
-      <li>Utiliza-se o algoritmo otimizado de **Dijkstra multi-source** por categoria de serviço para encontrar em lote o tempo mínimo até o estabelecimento mais próximo;</li>
-      <li>O índice individual do ponto é calculado como a porcentagem de categorias essenciais que o pedestre alcança em até 15 minutos a partir daquele nó.</li>
+      <li>Utiliza-se o algoritmo otimizado de **Dijkstra multi-source** por categoria de serviço para encontrar em lote
+        o tempo mínimo até o estabelecimento mais próximo;</li>
+      <li>O índice individual do ponto é calculado como a porcentagem de categorias essenciais que o pedestre alcança em
+        até 15 minutos a partir daquele nó.</li>
     </ul>
 
     <h3>Diagnóstico de Moreno para a Cidade</h3>
     <p>
-      Para classificar a cidade como um todo segundo o conceito da <em>Cidade de 15 Minutos</em> de Carlos Moreno, o sistema calcula o <strong>tempo pior</strong> (\(tempo\_pior(v)\)) de cada ponto do território. Este tempo representa quantos minutos são necessários para que um pedestre partindo daquele nó tenha acesso a <strong>todas</strong> as categorias de serviços essenciais existentes na cidade.
+      Para classificar a cidade como um todo segundo o conceito da <em>Cidade de 15 Minutos</em> de Carlos Moreno, o
+      sistema calcula o <strong>tempo pior</strong> (\(tempo\_pior(v)\)) de cada ponto do território. Este tempo
+      representa quantos minutos são necessários para que um pedestre partindo daquele nó tenha acesso a
+      <strong>todas</strong> as categorias de serviços essenciais existentes na cidade.
     </p>
     <p>
       Com base nessa distribuição, duas métricas principais definem a classificação municipal:
     </p>
     <ul>
-      <li><strong>Cobertura Plena:</strong> A porcentagem de nós da cidade cujo \(tempo\_pior(v) \le 15\) minutos. Ou seja, qual fração do território urbano atende integralmente ao critério de Moreno.</li>
-      <li><strong>Minutos da Cidade:</strong> O teto do percentil 90 da distribuição do tempo pior (\(\lceil P90(tempo\_pior) \rceil\)). Se os minutos da cidade forem, por exemplo, 22, isso significa que 90% de todo o território urbano consegue acessar todas as categorias de serviços em até 22 minutos de caminhada.</li>
+      <li><strong>Cobertura Plena:</strong> A porcentagem de nós da cidade cujo \(tempo\_pior(v) \le 15\) minutos. Ou
+        seja, qual fração do território urbano atende integralmente ao critério de Moreno.</li>
+      <li><strong>Minutos da Cidade:</strong> O teto do percentil 90 da distribuição do tempo pior (\(\lceil
+        P90(tempo\_pior) \rceil\)). Se os minutos da cidade forem, por exemplo, 22, isso significa que 90% de todo o
+        território urbano consegue acessar todas as categorias de serviços em até 22 minutos de caminhada.</li>
     </ul>
     <p>
-      <strong>Nota sobre dados ausentes:</strong> Para evitar penalizar cidades pequenas por vazios de mapeamento do OpenStreetMap (ex.: rodoviária ausente no município), o cálculo desconsidera categorias que não possuem nenhum serviço mapeado na cidade, calculando a cobertura plena apenas sobre as categorias com pelo menos um serviço presente.
+      <strong>Nota sobre dados ausentes:</strong> Para evitar penalizar cidades pequenas por vazios de mapeamento do
+      OpenStreetMap (ex.: rodoviária ausente no município), o cálculo desconsidera categorias que não possuem nenhum
+      serviço mapeado na cidade, calculando a cobertura plena apenas sobre as categorias com pelo menos um serviço
+      presente.
     </p>
-    
+
     <div class="team-card">
       <strong>Equipe de Desenvolvimento (UNIP 2026):</strong>
       <ul style="margin-top: 5px; list-style-type: none; margin-left: 0;">
@@ -126,16 +148,20 @@
         <li>🎓 Pedro Henrique de Jesus</li>
       </ul>
     </div>
-    
+
     <div class="api-link-box">
-      Desenvolvedor? <a href="/api/docs" target="_blank">Use nossa API REST Pública</a> para integrar os dados e índices de alcançabilidade urbana nos seus próprios projetos.
+      Desenvolvedor? <a href="/api/docs" target="_blank">Use nossa API REST Pública</a> para integrar os dados e índices
+      de alcançabilidade urbana nos seus próprios projetos.
     </div>
-    
+
     <h3>Licenças e Créditos</h3>
     <p style="font-size:0.8rem; color:#64748b; margin-top:20px;">
-      Os dados geográficos utilizados neste projeto são fornecidos sob a licença Open Database License (ODbL) pelos colaboradores do **OpenStreetMap (OSM)**. A interface utiliza a biblioteca de mapas **Leaflet** sob licença BSD-2. As isócronas e análises de alcançabilidade são processadas usando Python, NetworkX e Shapely.
+      Os dados geográficos utilizados neste projeto são fornecidos sob a licença Open Database License (ODbL) pelos
+      colaboradores do **OpenStreetMap (OSM)**. A interface utiliza a biblioteca de mapas **Leaflet** sob licença BSD-2.
+      As isócronas e análises de alcançabilidade são processadas usando Python, NetworkX e Shapely.
     </p>
   </main>
 
 </body>
+
 </html>

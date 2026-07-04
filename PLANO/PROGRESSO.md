@@ -16,9 +16,9 @@
 | 09 Índice Moreno | ✅ concluída | 2026-07-03 | métrica da cidade inteira ("cidade de N minutos") |
 | 10 Análise configurável | ✅ concluída | 2026-07-03 | categorias selecionáveis + velocidade + mapa por serviço (sem reprocessar) |
 | 11 Página da API | ✅ concluída | 2026-07-03 | web/api.html com quickstart e exemplos reais |
-| 12 Identidade e gestão de cidades | ⬜ pendente | | geocodificação prévia (Nominatim), dedup por osm_id, atualizar/excluir |
-| 13 Vitrine de serviços | ⬜ pendente | | catálogo mestre + contagem Overpass + processamento seletivo |
-| 14 Moradia e trabalho (6 pilares) | ⬜ pendente | | modo livre intocado + modo completo: casa/trabalho entram no cálculo dinâmico |
+| 12 Identidade e gestão de cidades | ✅ concluída | 2026-07-04 | geocodificação prévia (Nominatim), dedup por osm_id, atualizar/excluir |
+| 13 Vitrine de serviços | ✅ concluída | 2026-07-04 | catálogo mestre + contagem Overpass + processamento seletivo |
+| 14 Moradia e trabalho (6 pilares) | ✅ concluída | 2026-07-04 | modo livre intocado + modo completo: casa/trabalho entram no cálculo dinâmico |
 
 Legenda: ⬜ pendente · 🔄 em andamento · ✅ concluída · ❌ bloqueada (explicar)
 

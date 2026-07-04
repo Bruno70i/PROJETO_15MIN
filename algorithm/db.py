@@ -17,10 +17,13 @@ def conectar_db():
     )
     return conn
 
-def carregar_categorias(conn) -> list[dict]:
-    """Carrega as categorias do banco (exceto id 0 geral)."""
+def carregar_categorias(conn, chaves=None) -> list[dict]:
+    """Carrega as categorias do banco (exceto id 0 geral), opcionalmente filtrando por chaves."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT id, chave, rotulo, tag_osm, cor_hex FROM categoria_servico WHERE id != 0 ORDER BY id")
+        if chaves is not None:
+            cur.execute("SELECT id, chave, rotulo, tag_osm, cor_hex FROM categoria_servico WHERE id != 0 AND chave = ANY(%s) ORDER BY id", (chaves,))
+        else:
+            cur.execute("SELECT id, chave, rotulo, tag_osm, cor_hex FROM categoria_servico WHERE id != 0 ORDER BY id")
         rows = cur.fetchall()
         for row in rows:
             if isinstance(row["tag_osm"], str):
@@ -35,17 +38,25 @@ def gravar_cidade(conn, cfg, G, resultados):
     with conn:
         with conn.cursor() as cur:
             # 1. Limpeza e criação da cidade
-            cur.execute("DELETE FROM cidade WHERE consulta_osm = %s", (cfg.consulta_osm,))
+            if cfg.osm_tipo and cfg.osm_id:
+                cur.execute("DELETE FROM cidade WHERE osm_limite_tipo = %s AND osm_limite_id = %s", (cfg.osm_tipo, cfg.osm_id))
+            else:
+                cur.execute("DELETE FROM cidade WHERE consulta_osm = %s", (cfg.consulta_osm,))
             
-            partes = [p.strip() for p in cfg.consulta_osm.split(",")]
-            nome = partes[0] if partes else cfg.consulta_osm
+            nome_original = cfg.nome_cidade if cfg.nome_cidade else cfg.consulta_osm
+            partes = [p.strip() for p in nome_original.split(",")]
+            nome = partes[0] if partes else nome_original
             pais = partes[-1] if len(partes) > 1 else ""
+            if not pais:
+                import warnings
+                warnings.warn(f"Pais vazio ao processar a cidade: {nome_original}")
+                pais = ""
             
             cur.execute("""
-                INSERT INTO cidade (nome, pais, consulta_osm, qtd_nos, qtd_arestas, tempo_execucao_s, velocidade_kmh, limiar_minutos)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO cidade (nome, pais, consulta_osm, osm_limite_tipo, osm_limite_id, qtd_nos, qtd_arestas, tempo_execucao_s, velocidade_kmh, limiar_minutos)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (nome, pais, cfg.consulta_osm, len(G.nodes), len(G.edges), resultados['tempo_execucao_s'], cfg.velocidade_kmh, cfg.limiar_minutos))
+            """, (nome, pais, cfg.consulta_osm or cfg.nome_cidade, cfg.osm_tipo, cfg.osm_id, len(G.nodes), len(G.edges), resultados['tempo_execucao_s'], cfg.velocidade_kmh, cfg.limiar_minutos))
             cidade_id = cur.fetchone()[0]
             
             # 2. Inserção de nós em lote
@@ -201,6 +212,16 @@ def gravar_cidade(conn, cfg, G, resultados):
                     json.dumps(m.get("categorias_ausentes", [])),
                     json.dumps(m["distribuicao"])
                 ))
+                
+            # 6.8 Gravar na tabela cidade_categoria (categorias processadas)
+            cat_cc_records = [(cidade_id, cat_id)
+                              for cat_id in resultados.get('categorias_processadas', [])]
+            if cat_cc_records:
+                psycopg2.extras.execute_values(
+                    cur,
+                    "INSERT INTO cidade_categoria (cidade_id, categoria_id) VALUES %s ON CONFLICT DO NOTHING",
+                    cat_cc_records
+                )
                 
             # 7. Atualização final das estatísticas na cidade
             cur.execute("""
