@@ -8,6 +8,17 @@ Nascimento, Guilherme Rocha e Pedro Henrique de Jesus.
 malha viária do OpenStreetMap) → PostgreSQL → API REST pública
 (Node/Express, Swagger em `/api/docs`) → interface web (Leaflet + tiles OSM).
 
+## Documentação
+
+- 📘 [**Documentação Técnica**](DOCS/DOCUMENTACAO.md) — arquitetura, cada
+  módulo de código, algoritmo, banco, API, interface e os conceitos
+  matemáticos, com diagramas.
+- 📊 [**Relatório do Projeto**](DOCS/RELATORIO.md) — visão para leigos e
+  técnicos: mapa do projeto, fluxograma, resultados e a formalização
+  matemática.
+- 🗺️ Documentação amigável da API pública: `web/api.html` (ou
+  `http://localhost:3000/api.html` com a API no ar) · técnica em `/api/docs`.
+
 ## Para o agente executor
 
 **Comece por [`PLANO/00_LEIA_PRIMEIRO.md`](PLANO/00_LEIA_PRIMEIRO.md).**
