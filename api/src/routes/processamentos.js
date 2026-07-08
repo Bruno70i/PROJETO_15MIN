@@ -10,6 +10,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const catalogoPath = path.resolve(__dirname, '../../../db/catalogo_mestre.json');
 const catalogo = JSON.parse(fs.readFileSync(catalogoPath, 'utf8'));
 
+// Raiz do projeto, deduzida da própria localização deste arquivo
+// (.../api/src/routes -> sobe 3 níveis). Não depende de configuração.
+const RAIZ_PROJETO = path.resolve(__dirname, '../../../');
+
+// Descobre automaticamente o Python do ambiente virtual (.venv) do projeto.
+// Windows: .venv\Scripts\python.exe | Linux/macOS: .venv/bin/python.
+// As variáveis de ambiente PYTHON_BIN e ALGORITHM_CWD continuam válidas como
+// override opcional, mas normalmente NÃO precisam ser configuradas.
+function descobrirPythonBin() {
+  if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+  const candidatos = process.platform === 'win32'
+    ? [path.join(RAIZ_PROJETO, '.venv', 'Scripts', 'python.exe')]
+    : [path.join(RAIZ_PROJETO, '.venv', 'bin', 'python'),
+       path.join(RAIZ_PROJETO, '.venv', 'bin', 'python3')];
+  for (const c of candidatos) {
+    if (fs.existsSync(c)) return c;
+  }
+  return 'python'; // fallback: usa o Python do PATH do sistema
+}
+
 export let jobAtual = null;
 export function getJobAtual() { return jobAtual; }
 let ultimoJob = null;
@@ -54,8 +74,8 @@ export async function iniciarJob({ osm_tipo, osm_id, nome_exibicao, consulta_osm
 
   logBuffer = [];
 
-  const pythonBin = process.env.PYTHON_BIN || 'python';
-  const algorithmCwd = process.env.ALGORITHM_CWD || process.cwd();
+  const pythonBin = descobrirPythonBin();
+  const algorithmCwd = process.env.ALGORITHM_CWD || RAIZ_PROJETO;
 
   const args = ['-m', 'algorithm.cli'];
   if (isCanonical) {

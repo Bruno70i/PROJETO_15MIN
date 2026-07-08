@@ -41,10 +41,13 @@ são adicionadas depois (passo 5).
 Copy-Item .env.example .env
 ```
 
-Edite o `.env` e ajuste:
-- `PGPASSWORD` — a senha do PostgreSQL desta máquina;
-- `PYTHON_BIN` — caminho do `python.exe` do `.venv` desta máquina;
-- `ALGORITHM_CWD` — caminho da pasta raiz do projeto nesta máquina.
+Edite o `.env` e ajuste apenas:
+- `PGPASSWORD` — a senha do PostgreSQL desta máquina.
+
+Só isso. Os caminhos do Python e da pasta do projeto são descobertos
+automaticamente pela API — não precisa configurar nada específico da
+máquina. (As variáveis `PYTHON_BIN` e `ALGORITHM_CWD` existem como override
+opcional, mas ficam em branco no uso normal.)
 
 ## 4. Dependências
 
