@@ -19,29 +19,28 @@ malha viária do OpenStreetMap) → PostgreSQL → API REST pública
 - 🗺️ Documentação amigável da API pública: `web/api.html` (ou
   `http://localhost:3000/api.html` com a API no ar) · técnica em `/api/docs`.
 
-## Para o agente executor
-
-**Comece por [`PLANO/00_LEIA_PRIMEIRO.md`](PLANO/00_LEIA_PRIMEIRO.md).**
-Ele define arquitetura, ordem das fases, regras de ambiente Windows,
-contratos e critérios de aceite. As fases 01–07 estão em `PLANO/`.
-Acompanhamento em [`PLANO/PROGRESSO.md`](PLANO/PROGRESSO.md).
-
 ## Como rodar o projeto
 
-Você pode executar a plataforma de duas formas: usando **Docker** (recomendado e mais fácil) ou **localmente** instalando todas as dependências à mão.
+Você pode executar a plataforma de duas formas: usando **Docker** (recomendado e mais fácil) ou **localmente** instalando todas as dependências à mão. 
+
+**Nota sobre a Interface:** O site (Frontend) já está embutido no servidor da API. Ao rodar o projeto (por Docker ou Manualmente), a interface web ficará automaticamente disponível e acessível no seu navegador!
 
 ### Opção 1: Com Docker (Recomendado)
-Se você tiver o [Docker](https://www.docker.com/) instalado:
-1. Abra um terminal na pasta `docker`.
-2. Rode o comando:
+Usando o Docker, você **não precisa** instalar pacotes manualmente (como `npm install` ou `pip install`), pois ele já faz tudo isso por você dentro dos contêineres.
+
+Se você tiver o [Docker Desktop](https://www.docker.com/) instalado:
+1. **Importante:** Certifique-se de que o aplicativo do Docker esteja **aberto e rodando** no seu computador.
+2. Na raiz do projeto, renomeie o arquivo `.env.example` para `.env` e coloque uma senha na variável `PGPASSWORD`.
+3. Abra um terminal na pasta `docker`.
+4. Rode o comando apontando para o seu arquivo de senhas:
    ```bash
-   docker compose up -d
+   docker compose --env-file ../.env up -d
    ```
-O Docker irá automaticamente baixar o banco PostgreSQL, criar as tabelas necessárias e inicializar a API Node.js.
-* Acesse a interface em: http://localhost:3000
+O Docker irá automaticamente baixar o banco PostgreSQL, criar as tabelas, instalar as dependências e subir a API Node.js.
+* **Acesse o site em:** http://localhost:3000
 
 ### Opção 2: Instalação Manual (Sem Docker)
-Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e PostgreSQL na sua máquina.
+Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e PostgreSQL instalados na sua máquina.
 
 1. **Configuração de Ambiente**:
    - Faça uma cópia do arquivo `.env.example` e renomeie para `.env`.
@@ -59,8 +58,8 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
      pip install -r requirements.txt
      ```
 
-4. **API Node.js (Servidor)**:
-   - Entre na pasta `api` e instale as bibliotecas Javascript:
+4. **API Node.js e Site (Servidor)**:
+   - Entre na pasta `api` e instale as dependências:
      ```bash
      cd api
      npm install
@@ -69,7 +68,7 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
      ```bash
      npm start
      ```
-   - Acesse a interface em: http://localhost:3000
+   - **Acesse o site em:** http://localhost:3000
 
 ---
 Dados © OpenStreetMap contributors (ODbL).

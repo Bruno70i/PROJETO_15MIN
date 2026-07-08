@@ -4,6 +4,7 @@ COPY api/package*.json ./api/
 RUN cd api && npm ci --omit=dev
 COPY api ./api
 COPY web ./web
+COPY db ./db
 EXPOSE 3000
 WORKDIR /app/api
 CMD ["node", "src/server.js"]
