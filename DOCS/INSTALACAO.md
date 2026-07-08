@@ -1,7 +1,11 @@
 # Guia de instalação (exportar para outro computador)
 
-Passo a passo para colocar o projeto para rodar em uma máquina nova. O que
-**não** é copiado junto (e precisa ser recriado localmente): `.venv/`,
+Há dois caminhos: **instalação manual** (Node + Python + PostgreSQL na
+máquina — recomendada, pois o processamento de novas cidades funciona) e
+**Docker** (mais rápido de subir, mas só serve cidades já processadas). A
+manual é descrita nos passos 1–5; a de Docker, ao final.
+
+O que **não** é copiado junto (e precisa ser recriado localmente): `.venv/`,
 `node_modules/`, `.env` e `cache_osm/` — todos ignorados pelo git de
 propósito, porque são específicos de cada máquina.
 
@@ -18,9 +22,10 @@ levar `.venv`, `node_modules` nem `cache_osm` — serão recriados.
 
 ## 2. Banco de dados
 
-Crie o banco e aplique o schema + as categorias. Ajuste o caminho do `psql`
-conforme a instalação (no Windows costuma ser
-`C:\Program Files\PostgreSQL\16\bin\psql.exe`).
+Crie o banco e aplique o schema + as categorias. Se o `psql` não estiver no
+PATH, use o caminho completo (no Windows costuma ser
+`C:\Program Files\PostgreSQL\<versão>\bin\psql.exe`, ex.: `...\16\...` ou
+`...\18\...`).
 
 ```powershell
 # criar o banco
@@ -103,4 +108,41 @@ curl.exe http://localhost:3000/api/v1/saude          # {"status":"ok","banco":tr
 # testes
 .venv\Scripts\python.exe -m pytest algorithm\tests -q
 cd api; npm test
+```
+
+---
+
+## Alternativa: rodar com Docker
+
+Sobe o **banco + API** em containers, sem instalar Node/PostgreSQL na
+máquina. Requer apenas o **Docker Desktop** aberto.
+
+```powershell
+# 1) na raiz do projeto, crie o .env e defina a senha
+Copy-Item .env.example .env      # edite PGPASSWORD
+
+# 2) suba os containers (a partir da pasta docker/)
+cd docker
+docker compose --env-file ../.env up -d --build
+```
+
+O banco é criado e populado automaticamente (o `db/` é montado como scripts
+de inicialização — `schema.sql` e depois `seed.sql`). Acesse
+`http://localhost:3000`.
+
+**Limitação importante:** a imagem contém apenas Node, **não o Python**.
+Logo, o botão "+ Adicionar nova cidade" **não funciona no Docker** (ele
+tentaria chamar o Python, que não existe no container, e o pedido retorna
+erro — sem derrubar a API). O modo Docker serve **cidades já processadas**;
+para tê-las no banco:
+
+- processe as cidades numa instalação manual e restaure o dump (seção
+  "Opcional — levar as cidades já processadas"), **ou**
+- use a instalação manual (passos 1–5), onde adicionar cidades funciona.
+
+Comandos úteis:
+```powershell
+docker compose logs -f api      # ver logs da API
+docker compose down             # parar (mantém os dados no volume)
+docker compose down -v          # parar e APAGAR os dados do banco
 ```

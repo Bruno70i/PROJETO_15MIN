@@ -1,0 +1,27 @@
+# Impede que arquivos locais (específicos da máquina) entrem na imagem Docker.
+# Sem isto, o "COPY api ./api" do Dockerfile copiaria o node_modules local
+# (binários do SO do desenvolvedor) por cima dos módulos Linux recém-instalados
+# — causa comum de erro ao rodar em outro computador.
+
+# Dependências (reinstaladas dentro da imagem)
+**/node_modules
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Segredos e configuração local (a imagem usa variáveis do docker-compose)
+**/.env
+!**/.env.example
+
+# Cache de dados do OSM (não deve ir para a imagem)
+cache_osm/
+cache/
+**/*.graphml
+
+# Controle de versão e documentação (não são necessários em runtime)
+.git/
+.gitignore
+DOCS/
+PLANO/
+*.md

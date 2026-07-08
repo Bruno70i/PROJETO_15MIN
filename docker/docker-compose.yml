@@ -1,17 +1,36 @@
+# =====================================================================
+# Sobe a plataforma (banco + API) em containers. A partir da pasta docker/:
+#   docker compose up -d --build
+#
+# A senha do banco pode ser definida por variável de ambiente PGPASSWORD;
+# se não for, usa o valor padrão abaixo (quinze15). O banco é inicializado
+# automaticamente com db/schema.sql e db/seed.sql na primeira subida.
+#
+# Observação: a imagem contém apenas Node (não o Python). O recurso
+# "adicionar cidade" pela interface NÃO funciona aqui — este ambiente serve
+# cidades já processadas. Para carregar cidades, restaure um dump no banco
+# (ver DOCS/INSTALACAO.md) ou processe na máquina host.
+# =====================================================================
+
 services:
   banco:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-quinze15}
       POSTGRES_DB: alcancabilidade
     volumes:
       - dados_pg:/var/lib/postgresql/data
-      - ../db:/docker-entrypoint-initdb.d:ro   # schema+seed na 1ª subida
+      - ../db:/docker-entrypoint-initdb.d:ro   # schema.sql + seed.sql na 1ª subida
     ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d alcancabilidade"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
-    build: 
+    build:
       context: ..
       dockerfile: api/Dockerfile
     restart: unless-stopped
@@ -20,10 +39,12 @@ services:
       PGPORT: 5432
       PGDATABASE: alcancabilidade
       PGUSER: postgres
-      PGPASSWORD: ${PGPASSWORD}
+      PGPASSWORD: ${PGPASSWORD:-quinze15}
       API_PORT: 3000
       WEB_DIR: /app/web
-    depends_on: [banco]
+    depends_on:
+      banco:
+        condition: service_healthy   # só sobe quando o Postgres aceitar conexões
     ports: ["3000:3000"]
 
 volumes:

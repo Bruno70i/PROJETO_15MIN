@@ -96,6 +96,22 @@ export async function iniciarJob({ osm_tipo, osm_id, nome_exibicao, consulta_osm
     env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
   });
 
+  // Trata falha ao INICIAR o processo (ex.: Python não encontrado — caso do
+  // ambiente Docker, que só tem Node). Sem este handler, o evento 'error'
+  // vira exceção não tratada e derruba a API inteira.
+  filho.on('error', (err) => {
+    logBuffer.push(`SPAWN ERROR: ${err.message}`);
+    if (jobAtual) {
+      jobAtual.status = 'erro';
+      jobAtual.msg = `Nao foi possivel iniciar o processador Python (${err.code || err.message}). `
+        + `Verifique se o Python do projeto (.venv) esta instalado nesta maquina.`;
+      jobAtual.codigoSaida = -1;
+      jobAtual.terminadoEm = new Date();
+      ultimoJob = { ...jobAtual };
+      jobAtual = null;
+    }
+  });
+
   let stdoutAcumulado = '';
 
   filho.stdout.on('data', (chunk) => {

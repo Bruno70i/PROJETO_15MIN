@@ -27,19 +27,25 @@ Você pode executar a plataforma de duas formas: usando **Docker** (recomendado 
 
 **Nota sobre a Interface:** O site (Frontend) já está embutido no servidor da API. Ao rodar o projeto (por Docker ou Manualmente), a interface web ficará automaticamente disponível e acessível no seu navegador!
 
-### Opção 1: Com Docker (Recomendado)
+### Opção 1: Com Docker (mais fácil para visualizar)
 Usando o Docker, você **não precisa** instalar pacotes manualmente (como `npm install` ou `pip install`), pois ele já faz tudo isso por você dentro dos contêineres.
 
 Se você tiver o [Docker Desktop](https://www.docker.com/) instalado:
 1. **Importante:** Certifique-se de que o aplicativo do Docker esteja **aberto e rodando** no seu computador.
 2. Na raiz do projeto, renomeie o arquivo `.env.example` para `.env` e coloque uma senha na variável `PGPASSWORD`.
 3. Abra um terminal na pasta `docker`.
-4. Rode o comando apontando para o seu arquivo de senhas:
+4. Rode o comando (na primeira vez use `--build` para construir a imagem):
    ```bash
-   docker compose --env-file ../.env up -d
+   docker compose --env-file ../.env up -d --build
    ```
 O Docker irá automaticamente baixar o banco PostgreSQL, criar as tabelas, instalar as dependências e subir a API Node.js.
 * **Acesse o site em:** http://localhost:3000
+
+> ⚠️ **Limitação do Docker:** a imagem contém apenas o Node (não o Python).
+> Por isso o botão **"+ Adicionar nova cidade"** não funciona no modo Docker —
+> ele serve cidades **já processadas**. Para ter cidades no banco, restaure um
+> dump (ver [Guia de instalação](DOCS/INSTALACAO.md)) ou use a **Opção 2**
+> (instalação manual), onde o processamento de novas cidades funciona.
 
 ### Opção 2: Instalação Manual (Sem Docker)
 Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e PostgreSQL instalados na sua máquina.
