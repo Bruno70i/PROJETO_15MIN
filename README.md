@@ -57,10 +57,12 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
 2. **Banco de Dados**:
    - Crie um banco de dados chamado `alcancabilidade` no seu PostgreSQL.
    - Execute os scripts localizados na pasta `db` (`schema.sql` seguido de `seed.sql`) para criar a estrutura e semear os dados essenciais.
-
+   - Verifique a Porta e Senha, caso contrário não irá conectar ao banco
+     - No arquivo `.env` ajuste as variáveis `PGPORT` e `PGPASSWORD` se necessário.
+     
 3. **Backend Python (Algoritmo)**:
-   - Crie um ambiente virtual: `python -m venv .venv`
-   - Ative o ambiente: `.venv\Scripts\activate` (Windows) ou `source .venv/bin/activate` (Linux/Mac)
+   - Crie um ambiente virtual: ```python -m venv .venv```
+   - Ative o ambiente: ```.venv\Scripts\activate``` (Windows) ou ```source .venv/bin/activate``` (Linux/Mac)
    - Instale as bibliotecas:
      ```bash
      pip install -r requirements.txt
