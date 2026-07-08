@@ -70,33 +70,28 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
    ```bash
    .venv\Scripts\activate
    ``` 
-   
-   - ou (Linux/Mac)
-   ```bash
-   source .venv/bin/activate
-   ```
-   
+  
    - Instale as bibliotecas:
     ```bash
     pip install -r requirements.txt
     ```
 
 4. **API Node.js e Site (Servidor)**:
-  - Entre na pasta `api`:
+   - Entre na pasta `api`:
     ```bash
     cd api
     ```
 
-  - Instale as dependências Node.js
+   - Instale as dependências Node.js
     ```bash
     npm install
     ```
 
-  - Inicie o servidor:
+   - Inicie o servidor:
     ```bash
     npm ren dev
     ```
-  - **Acesse o site em:** http://localhost:3000
+   - **Acesse o site em:** http://localhost:3000
 
 ---
 Dados © OpenStreetMap contributors (ODbL).
