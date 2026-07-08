@@ -77,26 +77,26 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
    ```
    
    - Instale as bibliotecas:
-     ```bash
-     pip install -r requirements.txt
-     ```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 4. **API Node.js e Site (Servidor)**:
-   - Entre na pasta `api`:
-     ```bash
-     cd api
-     ```
-     
-   - Instale as dependências Node.js
-     ```bash
-     npm install
-     ```
+  - Entre na pasta `api`:
+    ```bash
+    cd api
+    ```
 
-   - Inicie o servidor:
-     ```bash
-     npm start
-     ```
-   - **Acesse o site em:** http://localhost:3000
+  - Instale as dependências Node.js
+    ```bash
+    npm install
+    ```
+
+  - Inicie o servidor:
+    ```bash
+    npm ren dev
+    ```
+  - **Acesse o site em:** http://localhost:3000
 
 ---
 Dados © OpenStreetMap contributors (ODbL).
