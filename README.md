@@ -18,6 +18,8 @@ malha viária do OpenStreetMap) → PostgreSQL → API REST pública
   matemática.
 - 🗺️ Documentação amigável da API pública: `web/api.html` (ou
   `http://localhost:3000/api.html` com a API no ar) · técnica em `/api/docs`.
+- 🖥️ [**Guia de instalação**](DOCS/INSTALACAO.md) — como colocar o projeto
+  para rodar em outra máquina (banco, dependências, `.env`).
 
 ## Como rodar o projeto
 
