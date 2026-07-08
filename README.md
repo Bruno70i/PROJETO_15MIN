@@ -61,19 +61,37 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
      - No arquivo `.env` ajuste as variáveis `PGPORT` e `PGPASSWORD` se necessário.
      
 3. **Backend Python (Algoritmo)**:
-   - Crie um ambiente virtual: ```python -m venv .venv```
-   - Ative o ambiente: ```.venv\Scripts\activate``` (Windows) ou ```source .venv/bin/activate``` (Linux/Mac)
+   - Crie um ambiente virtual: 
+   ```bash
+   python -m venv .venv
+   ```
+
+   - Ative o ambiente (Windows): 
+   ```bash
+   .venv\Scripts\activate
+   ``` 
+   
+   - ou (Linux/Mac)
+   ```bash
+   source .venv/bin/activate
+   ```
+   
    - Instale as bibliotecas:
      ```bash
      pip install -r requirements.txt
      ```
 
 4. **API Node.js e Site (Servidor)**:
-   - Entre na pasta `api` e instale as dependências:
+   - Entre na pasta `api`:
      ```bash
      cd api
+     ```
+     
+   - Instale as dependências Node.js
+     ```bash
      npm install
      ```
+
    - Inicie o servidor:
      ```bash
      npm start
