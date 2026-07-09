@@ -89,7 +89,7 @@ Caso prefira não usar o Docker, você precisará de Node.js, Python 3.11+ e Pos
 
    - Inicie o servidor:
     ```bash
-    npm ren dev
+    npm run dev
     ```
    - **Acesse o site em:** http://localhost:3000
 
